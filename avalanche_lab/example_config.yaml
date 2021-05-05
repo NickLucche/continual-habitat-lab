@@ -1,0 +1,5 @@
+agent:
+  sensor: ['rgb', 'depth']
+  
+task_name:
+  sensors: ['rgb']
