@@ -22,7 +22,8 @@ class Task:
     def reward_function(self, obs: gym.spaces.dict.Dict, action):
         raise NotImplementedError()
 
-
+from avalanche_lab.registry import registry
+@registry.register_task
 class VoidTask(Task):
     reward_range = (0.0, 0.0)
 

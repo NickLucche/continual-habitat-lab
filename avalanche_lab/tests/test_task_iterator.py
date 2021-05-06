@@ -1,0 +1,1 @@
+# make sure it works with no tasks
