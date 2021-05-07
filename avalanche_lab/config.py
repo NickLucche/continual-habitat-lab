@@ -16,18 +16,29 @@ class TASK_SAMPLING(enum.IntEnum):
 
 
 # default configuration here
-# @dataclass
-# class SimulatorConfig:
+@dataclass
+class SimulatorConfig:
+    # TODO: instatiate from SimConfig() class
+    # scene_id: str = '' this is ignored anyway
+    default_agent_id: int = 0
 
 
 @dataclass
 class SceneConfig:
-    # TODO: dataset paths
-    scenes_paths: List[str] = field(
+    # dataset paths, recursively finds scenes files inside each directory 
+    dataset_paths: List[str] = field(
         default_factory=lambda: [
-            "data/scene_datasets/habitat-test-scenes/skokloster-castle.glb"
+            "data/scene_datasets/habitat-test-scenes/"
         ]
     )
+    split_dataset_subdirectories: bool = False
+    max_scene_repeat_episodes: int = -1
+    # cycle datasets, can't move to other dataset before all scenes have been selected 
+    cycle_datasets: bool = False
+    # sample next scene from any specified dataset
+    sample_random_scene: bool = True
+    # TODO: move to sim?
+    change_lighting: bool = False
 
 
 @dataclass
@@ -53,7 +64,8 @@ class BaseConfig:
     experiment_name: str = "MyAvalanceExperiment"
     tasks: List[TaskConfig] = field(default_factory=lambda: [])
     task_iterator: TaskIteratorConfig = TaskIteratorConfig()
-    scene_handler: SceneConfig = SceneConfig()
+    scene: SceneConfig = SceneConfig()
+    simulator:SimulatorConfig = SimulatorConfig()
 
 
 base_config = OmegaConf.structured(BaseConfig)
@@ -72,6 +84,30 @@ class AvalancheConfig:
     @staticmethod
     def from_yaml(filepath: str) -> "AvalancheConfig":
         return AvalancheConfig(OmegaConf.load(filepath))
+
+    @staticmethod
+    def habitat_sim_config(config: 'AvalancheConfig', scene: str):
+        import habitat_sim
+        sim_cfg = habitat_sim.SimulatorConfiguration()
+        for k, v in config.simulator.items():
+            setattr(sim_cfg, k, v)
+
+        sim_cfg.scene_id = scene
+        # agent
+        agent_cfg = habitat_sim.agent.AgentConfiguration()
+
+        # In the 1st example, we attach only one sensor,
+        # a RGB visual sensor, to the agent
+        rgb_sensor_spec = habitat_sim.CameraSensorSpec()
+        rgb_sensor_spec.uuid = "rgb"
+        rgb_sensor_spec.sensor_type = habitat_sim.SensorType.COLOR
+        rgb_sensor_spec.resolution = [512, 512]
+        rgb_sensor_spec.position = [0.0, 2.0, 0.0]
+
+        agent_cfg.sensor_specifications = [rgb_sensor_spec]
+
+        return habitat_sim.Configuration(sim_cfg, [agent_cfg])
+
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self.config, name)

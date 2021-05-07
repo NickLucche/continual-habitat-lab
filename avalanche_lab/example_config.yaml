@@ -5,3 +5,6 @@ tasks:
   - name: "MyTask"
   - type: "VoidTask"
   - sensors: ['rgb']
+
+scene:
+  dataset_paths: ['data/scene_datasets/habitat-test-scenes/']

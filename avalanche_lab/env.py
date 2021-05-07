@@ -7,6 +7,7 @@ from avalanche_lab.tasks import Task, VoidTask
 from avalanche_lab.task_collection import TaskCollection, TaskIterator
 import time
 
+
 class Env(gym.Env):
     sim: Simulator
     task_iterator: TaskIterator
@@ -14,12 +15,14 @@ class Env(gym.Env):
     _episode_over: bool = False
     _episode_counter: int = 0
     _action_counter: int = 0
-    _episode_start_time:float = None
+    _episode_start_time: float = None
     _config: AvalancheConfig
 
     def __init__(self, config: AvalancheConfig) -> None:
         self.scene_manager = SceneManager(config)
-        self.sim = Simulator(self.scene_manager.habitat_config())
+        # TODO: refactor this
+        scene, _ = self.scene_manager.get_scene(0)
+        self.sim = Simulator(AvalancheConfig.habitat_sim_config(config, scene))
         # init agent
         agent = self.sim.initialize_agent(0)
 
@@ -30,16 +33,21 @@ class Env(gym.Env):
     def reset(self):
         self._episode_start_time = time.time()
         self._episode_over = False
-        
+
         self._episode_counter += 1
         # task may change on new episode
         task = self._get_task(is_reset=True)
 
-        self.sim.reconfigure(self.scene_manager.habitat_config())
+        # scene may also change on new episode
+        scene, changed = self.scene_manager.get_scene(self._episode_counter)
+
+        # TODO: suppress output to console from sim if possible or reconfigure only on scene change
+        if changed:
+            self.sim.reconfigure(AvalancheConfig.habitat_sim_config(self._config, scene))
         obs = self.sim.reset()
         return obs
 
-    def step(self, action, dt: float=1/60):
+    def step(self, action, dt: float = 1 / 60):
         # The desired amount of time to advance the physical world.
         assert (
             self._episode_start_time is not None
@@ -63,10 +71,12 @@ class Env(gym.Env):
         return super().render(mode=mode)
 
     def _get_task(self, is_reset: bool = False):
-        task, changed = self.task_iterator.get_task(self._episode_counter, self._action_counter)
+        task, changed = self.task_iterator.get_task(
+            self._episode_counter, self._action_counter
+        )
 
         return task
-    
+
     @property
     def tasks(self):
         return self.task_iterator.tasks
@@ -96,7 +106,6 @@ class Env(gym.Env):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
-    
 
+    # multitask env will follow later
 
-    # multitask env will follow later  
