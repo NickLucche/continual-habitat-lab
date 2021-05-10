@@ -20,11 +20,11 @@ class Env(gym.Env):
 
     def __init__(self, config: AvalancheConfig) -> None:
         self.scene_manager = SceneManager(config)
-        # TODO: refactor this
-        scene, _ = self.scene_manager.get_scene(0)
-        self.sim = Simulator(AvalancheConfig.habitat_sim_config(config, scene))
-        # init agent
-        agent = self.sim.initialize_agent(0)
+        scene = self.scene_manager.current_scene
+        self.sim = Simulator(config.make_habitat_sim_config(scene))
+        # init agent(s)
+        for i in range(len(config.habitat_sim_config.agents)):
+            self.sim.initialize_agent(i)
 
         self.task_iterator = TaskIterator(config)
         self._config = config
@@ -41,7 +41,8 @@ class Env(gym.Env):
         # scene may also change on new episode
         scene, changed = self.scene_manager.get_scene(self._episode_counter)
 
-        # TODO: suppress output to console from sim if possible or reconfigure only on scene change
+        # TODO: suppress output to console from sim if possible
+        # reconfigure only on scene change
         if changed:
             self.sim.reconfigure(AvalancheConfig.habitat_sim_config(self._config, scene))
         obs = self.sim.reset()

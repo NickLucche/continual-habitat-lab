@@ -110,3 +110,11 @@ class SceneManager:
             return True
         return False
 
+    @property
+    def current_scene(self):
+        return self._current_scene
+
+    @property
+    def current_dataset(self):
+        return self._current_dataset
+
