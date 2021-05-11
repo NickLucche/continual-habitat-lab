@@ -1,6 +1,6 @@
 from habitat_sim import CameraSensorSpec
 from habitat_sim.agent.agent import ActionSpec
-from omegaconf import OmegaConf
+from omegaconf import OmegaConf, MISSING
 from typing import Any, Dict, List, Tuple, Optional
 from dataclasses import asdict, dataclass, field
 import habitat_sim
@@ -71,11 +71,14 @@ _default_agent_cfg = get_default_agent_cfg()
 
 
 @dataclass
-class CameraSensorConfig:
+class SensorConfig:
     uuid: str = None
     sensor_type: habitat_sim.SensorType = None
+    sensor_subtype: habitat_sim.SensorSubType = None
+    parameters: Dict[str, str] = None
     resolution: List[float] = None
     position: List[float] = None
+    orientation: List[float] = None
 
     def from_camera_sensor_spec(self, spec: CameraSensorSpec):
         # TODO:
@@ -96,7 +99,7 @@ class AgentConfig:
     linear_friction: float = None
     mass: float = None
     radius: float = None
-    sensor_specifications: List[CameraSensorConfig] = field(default_factory=lambda: [])
+    sensor_specifications: List[SensorConfig] = field(default_factory=lambda: [])
 
     def __post_init__(self):
         for k in asdict(self):
@@ -121,8 +124,8 @@ class SceneConfig:
 
 @dataclass
 class TaskConfig:
-    name: str
-    type: str
+    name: str = ''
+    type: str = MISSING
 
 
 @dataclass
@@ -199,5 +202,15 @@ class AvalancheConfig(object):
         agent_cfg = habitat_sim.agent.AgentConfiguration()
         for k, v in self._config.agent.items():
             setattr(agent_cfg, k, v)
+
+        # FIXME: cant assign a CameraSensorSpec object to configuration
+        # attach RGB visual sensor to the agent
+        rgb_sensor_spec = habitat_sim.CameraSensorSpec()
+        rgb_sensor_spec.uuid = "rgb"
+        rgb_sensor_spec.sensor_type = habitat_sim.SensorType.COLOR
+        rgb_sensor_spec.resolution = [512, 512]
+        rgb_sensor_spec.position = [0.0, 2.0, 0.0]
+        # config.agent.sensor_specifications = [rgb_sensor_spec]
+        agent_cfg.sensor_specifications = [rgb_sensor_spec]
         self._agent_cfgs = [agent_cfg]
 

@@ -26,7 +26,7 @@ class Env(gym.Env):
         for i in range(len(config.habitat_sim_config.agents)):
             self.sim.initialize_agent(i)
 
-        self.task_iterator = TaskIterator(config)
+        self.task_iterator = TaskIterator(config, self.sim)
         self._config = config
         # TODO: check agent has required sensors to carry out tasks (obs space check)
 
@@ -88,12 +88,17 @@ class Env(gym.Env):
 
     @property
     def observation_space(self):
-        # TODO: merge of active tasks obs spaces. agent has bunch of sensors, but some task may require to only use a subset of them
+        # TODO: merge of active tasks obs spaces. agent has bunch of sensors, 
+        # but some task may require to only use a subset of them
         pass
 
     @property
     def reward_range(self):
         pass
+
+    @property
+    def elapsed_time(self):
+        return time.time() - self._episode_start_time
 
     def seed(self, seed):
         return self.sim.seed(seed)

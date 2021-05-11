@@ -1,3 +1,4 @@
+import habitat_sim
 from avalanche_lab.config import AvalancheConfig, TASK_SAMPLING, TASK_CHANGE_BEHAVIOR
 from avalanche_lab.tasks import Task
 import logging
@@ -8,8 +9,8 @@ import numpy as np
 
 class TaskCollection:
     _tasks: List[Task]
-    _tasks_by_type: Dict[str, List[Task]]
-    _num_tasks: int
+    _tasks_by_type: Dict[str, List[Task]] = {}
+    _num_tasks: int = 0
     # _active_task_idxs:set = set()
 
     def __init__(self, tasks: List[Task]) -> None:
@@ -20,17 +21,22 @@ class TaskCollection:
         self._num_tasks = len(tasks)
 
     @staticmethod
-    def from_config(config: AvalancheConfig) -> "TaskCollection":
-        return TaskCollection(list(map(registry.get_task, config.tasks)))
+    def from_config(
+        config: AvalancheConfig, sim: habitat_sim.Simulator
+    ) -> "TaskCollection":
+        return TaskCollection(
+            list(map(lambda t: registry.get_task(t.type)(sim), config.tasks))
+        )
 
     def add_task(self, task: Task):
         self._tasks.append(task)
         self._add_task_to_type_index(task)
         self._num_tasks += 1
 
-    # def add_active_task(self, task: Task):
-    #     idx = self._tasks.index(task)
-    #     self._active_task_idxs.add(idx)
+    def remove_task(self, task: Task):
+        self._tasks.remove(task)
+        self._add_task_to_type_index(task)
+        self._num_tasks -= 1
 
     def _add_task_to_type_index(self, task: Task):
         ttype = task.__class__.__name__
@@ -39,25 +45,21 @@ class TaskCollection:
         else:
             self._tasks_by_type[ttype] = [task]
 
+    def _remove_task_to_type_index(self, task: Task):
+        ttype = task.__class__.__name__
+        self._tasks_by_type[ttype].remove(task)
+
     def sample_tasks_idxs(self, n_tasks: int = 1, exclude_idxs=[]) -> Task:
         return np.random.choice(
             [i for i in range(len(self._tasks)) if i not in exclude_idxs], n_tasks,
         )
 
     def sample_tasks(self, n_tasks: int = 1, exclude_idxs=[]) -> Task:
-        return self._tasks[self.sample_tasks_idxs(n_tasks, exclude_idxs)]
+        return [self._tasks[i] for i in self.sample_tasks_idxs(n_tasks, exclude_idxs)]
 
     @property
     def tasks(self):
         return [t for t in self._tasks]
-
-    # @property
-    # def active_tasks(self):
-    #     return self._tasks[list(self._active_task_idxs)]
-
-    # @property
-    # def inactive_tasks(self):
-    #     return [t for t in self._tasks if t not in self._active_task_idxs]
 
     def __len__(self):
         return self._num_tasks
@@ -74,6 +76,12 @@ class TaskCollection:
         for t in self._tasks:
             yield t
 
+    def __eq__(self, o: object) -> bool:
+        if isinstance(o, TaskCollection):
+            return self._tasks == o._tasks
+        else:
+            return self._tasks == o
+
 
 class TaskIterator:
     tasks: TaskCollection
@@ -84,28 +92,34 @@ class TaskIterator:
     _task_sampling: TASK_SAMPLING
 
     # implement fixed and non-fixed timestep task change + sequential/random task sampling
-    def __init__(self, config: AvalancheConfig) -> None:
-        self.tasks = TaskCollection.from_config(config)
+    def __init__(self, config: AvalancheConfig, sim: habitat_sim.Simulator) -> None:
+        self.tasks = TaskCollection.from_config(config, sim)
         # set active task
         if config.task_iterator.start_from_random_task:
             self._active_task_idx = self.tasks.sample_tasks_idxs(1)
         self._config = config
         self._task_change_behavior = self._config.task_iterator.task_change_behavior
         self._task_sampling = self._config.task_iterator.task_sampling
+        # non-fixed timestep change, sample next timestep in which we change task
+        if self._task_change_behavior == TASK_CHANGE_BEHAVIOR.NON_FIXED:
+            self._next_task_change_timestep = np.random.randint(
+                self._config.task_iterator.task_change_timesteps_low,
+                self._config.task_iterator.task_change_timesteps_high,
+            )
 
     # def __next__(self):
     def get_task(self, episode_num: int, cumulative_steps: int):
         if len(self.tasks) == 0:
             return None, False
-            
+
         # check whether we need to change active task
         change = self._change_task(episode_num, cumulative_steps)
         if change:
             self._change_active_task(episode_num)
         return self.tasks[self._active_task_idx], change
 
-    def __iter__(self):
-        return self
+    # def __iter__(self):
+    # return self
 
     def _change_task(self, episode_num: int, cumulative_steps: int):
         def _check_max_task_repeat(global_counter: int, counter_threshold: int):
@@ -117,38 +131,46 @@ class TaskIterator:
                     return True
             elif self._task_change_behavior == TASK_CHANGE_BEHAVIOR.NON_FIXED:
                 # change task after a random number of steps/episodes
-                if global_counter %  self._next_task_change_timestep == 0:
+                if (
+                    self._next_task_change_timestep > 0
+                    and global_counter % self._next_task_change_timestep == 0
+                ):
                     return True
             return False
 
-        if len(self.tasks) <= 1 or episode_num==0:
+        if len(self.tasks) <= 1 or episode_num == 0:
             return False
 
-        cum_steps_change = self._config.task_iterator.max_task_repeat_steps
-        episodes_change = self._config.task_iterator.max_task_repeat_episodes
+        cum_steps_change = self._config.task_iterator.get("max_task_repeat_steps", -1)
+        episodes_change = self._config.task_iterator.get("max_task_repeat_episodes", -1)
 
-        if cum_steps_change is None and episodes_change is None:
+        if cum_steps_change <= 0 and episodes_change <= 0:
             return False
         # episode change has priority
-        elif episodes_change:
+        elif episodes_change > 0:
             return _check_max_task_repeat(episode_num, episodes_change)
         else:
             return _check_max_task_repeat(cumulative_steps, cum_steps_change)
 
     def _change_active_task(self, ep_num: int):
         if self._task_change_behavior == TASK_CHANGE_BEHAVIOR.NON_FIXED:
-            # non-fixed timestep change, sample next timestep in which we change task 
-            self._next_task_change_timestep = np.random.randint(
-                self._config.task_iterator.task_change_timesteps_low,
-                self._config.task_iterator.task_change_timesteps_high,
-            ) + ep_num
-        
+            # non-fixed timestep change, sample next timestep in which we change task
+            self._next_task_change_timestep = (
+                np.random.randint(
+                    self._config.task_iterator.task_change_timesteps_low,
+                    self._config.task_iterator.task_change_timesteps_high,
+                )
+                + ep_num
+            )
+
         prev_task_idx = self._active_task_idx
         if self._task_sampling == TASK_SAMPLING.SEQUENTIAL:
-            self._active_task_idx = (self._curr_task_idx + 1) % len(self.tasks)
+            self._active_task_idx = (self._active_task_idx + 1) % len(self.tasks)
         elif self._task_sampling == TASK_SAMPLING.RANDOM.name:
             # sample from other tasks with equal probability
-            self._active_task_idx = self.tasks.sample_tasks_idxs(1, exclude_idxs=[self._active_task_idx])
+            self._active_task_idx = self.tasks.sample_tasks_idxs(
+                1, exclude_idxs=[self._active_task_idx]
+            )
 
         logging.info(
             "Current task changed from {} (id: {}) to {} (id: {}).".format(
@@ -158,4 +180,3 @@ class TaskIterator:
                 self._active_task_idx,
             )
         )
-        

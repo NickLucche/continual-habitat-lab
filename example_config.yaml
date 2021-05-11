@@ -1,7 +1,10 @@
 simulator:
   random_seed: 7
-# agent:
+agent:
   # sensor: ['rgb', 'depth']
+  action_space:
+    move_forward:
+      name: 'some_name'
 # tasks:
 #   - name: "MyTask"
 #     type: "VoidTask"

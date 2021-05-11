@@ -39,14 +39,7 @@ if __name__ == "__main__":
     # config = AvalancheConfig(from_cli=False)
     config = AvalancheConfig.from_yaml('example_config.yaml')
     config.scene.max_scene_repeat_episodes = -1
-    # In the 1st example, we attach only one sensor,
-    # a RGB visual sensor, to the agent
-    rgb_sensor_spec = habitat_sim.CameraSensorSpec()
-    rgb_sensor_spec.uuid = "rgb"
-    rgb_sensor_spec.sensor_type = habitat_sim.SensorType.COLOR
-    rgb_sensor_spec.resolution = [512, 512]
-    rgb_sensor_spec.position = [0.0, 2.0, 0.0]
-    config.agent.sensor_specifications = [rgb_sensor_spec]
+
 
     print("Simulator configuration:\n", OmegaConf.to_yaml(config._config) )
     with Env(config) as env:
@@ -55,6 +48,7 @@ if __name__ == "__main__":
             config.habitat_sim_config.agents[0].action_space.keys()
         )
         print("Available actions", action_names)
+        print(config.habitat_sim_config.agents[0].action_space)
         print("Current scene:", env.scene_manager._current_scene)
         for _ in range(n_episodes):
             end = False
