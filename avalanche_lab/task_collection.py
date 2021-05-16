@@ -1,6 +1,6 @@
 import habitat_sim
 from avalanche_lab.config import AvalancheConfig, TASK_SAMPLING, TASK_CHANGE_BEHAVIOR
-from avalanche_lab.tasks import Task, VoidTask
+from avalanche_lab.tasks.tasks import Task, VoidTask
 import logging
 from avalanche_lab.registry import registry
 from typing import List, Dict, Tuple

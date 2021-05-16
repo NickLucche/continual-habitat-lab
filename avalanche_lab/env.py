@@ -14,7 +14,7 @@ class Env(gym.Env):
     sim: Simulator
     task_iterator: TaskIterator
     scene_manager: SceneManager
-    _episode_over: bool = False
+    _episode_over: bool = True
     _episode_counter: int = 0
     _action_counter: int = 0
     _episode_start_time: float = None
@@ -40,6 +40,7 @@ class Env(gym.Env):
         self._episode_counter += 1
         # task may change on new episode
         task = self._get_task(is_reset=True)
+        task.on_new_episode()
 
         # scene may also change on new episode
         scene, changed = self.scene_manager.get_scene(self._episode_counter)
@@ -60,7 +61,7 @@ class Env(gym.Env):
             self._episode_start_time is not None
         ), "Cannot call step before calling reset"
         assert (
-            self._episode_over is False
+            self._episode_over == False
         ), "Episode over, call reset before calling step"
         # TODO: single-agent only for now
 
@@ -89,6 +90,8 @@ class Env(gym.Env):
         task, changed = self.task_iterator.get_task(
             self._episode_counter, self._action_counter
         )
+        if changed:
+            task.on_task_change()
 
         return task
 
@@ -125,6 +128,14 @@ class Env(gym.Env):
     @property
     def current_scene(self):
         return self.scene_manager.current_scene
+
+    @property
+    def done(self):
+        return self._episode_over
+
+    @property
+    def agent_position(self):
+        return self.sim.get_agent(0).get_state().position
 
     @property
     def info(self):

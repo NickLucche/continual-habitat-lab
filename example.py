@@ -53,11 +53,12 @@ if __name__ == "__main__":
         for _ in range(n_episodes):
             end = False
             obs = env.reset()
+            print("Initial position", env.agent_position)
             visualize(args.interactive, obs)
             # assert env._curr_task_idx == task_idx, "Task should change at each new episode"
             task_idx = (task_idx + 1) % 2
-            # TODO: while not env.episode_over:
-            for i in range(3):
+            while not env.done:
+            # for i in range(3):
                 if args.interactive:
                     keystroke = cv2.waitKey(0)
                     # ord gets unicode from one-char string
@@ -87,7 +88,9 @@ if __name__ == "__main__":
                 # env.step(env.action_space.sample())
                 print("action", action)
                 obs, reward, done, _ = env.step(action)
+                print(f"Reward: {reward}, done: {done}")
                 visualize(args.interactive, obs)
+                print("Current position", env.agent_position)
 
             if end:
                 break

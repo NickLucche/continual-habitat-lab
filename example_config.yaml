@@ -1,14 +1,15 @@
 simulator:
   random_seed: 7
-# agent:
+agent:
+  height: 1.4
   # sensor: ['rgb', 'depth']
   # action_space:
     # move_forward:
       # name: 'some_name'
-# tasks:
-#   - name: "MyTask"
-#     type: "VoidTask"
-#     sensors: ['rgb']
+tasks:
+  - name: "MyTask"
+    type: "ObjectNav"
+    # sensors: ['rgb']
 
 scene:
   dataset_paths: ['data/scene_datasets/habitat-test-scenes/']

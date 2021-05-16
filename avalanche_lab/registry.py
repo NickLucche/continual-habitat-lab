@@ -31,8 +31,7 @@ import collections
 from typing import Any, Callable, DefaultDict, Optional, Type, Dict, List
 
 from habitat_sim import ActionSpec
-from avalanche_lab.tasks import Task
-# FIXME: Simply subclass habitat_sim registry
+from avalanche_lab.tasks.tasks import Task
 from habitat_sim.registry import _Registry
 import re
 

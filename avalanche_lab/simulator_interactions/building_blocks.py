@@ -7,8 +7,6 @@ import habitat_sim
 from habitat_sim.utils.common import quat_from_angle_axis, quat_rotate_vector
 
 # more at https://github.com/facebookresearch/habitat-sim/blob/master/examples/tutorials/new_actions.py
-# FIXME: this only works programatically for now
-# FIXME: register action, simply use habitat_sim registry 
 @dataclass
 class ActionParameters:
     # specify default values here
@@ -110,27 +108,3 @@ class StrafeRight(habitat_sim.SceneNodeControl):
             scene_node, actuation_spec.forward_amount, -actuation_spec.strafe_angle
         )
 
-# This is wrapped in a such that it can be added to a unit test
-def main():
-
-    # The habitat_sim.ActionSpec defines an action.  The first arguement is the regsitered name
-    # of the control spec, the second is the parameter spec
-    # agent_config.action_space["fwd_and_spin"] = habitat_sim.ActionSpec(
-        # "move_forward_and_spin", MoveAndSpinSpec(1.0, 45.0)
-    # )
-
-    
-
-    # Take the new actions using `action key`
-    # sim.step("fwd_and_spin")
-    # print(sim.get_agent(0).state)
-
-    
-
-    agent_config = habitat_sim.AgentConfiguration()
-    agent_config.action_space["strafe_left"] = habitat_sim.ActionSpec(
-        "strafe_left", StrafeActuationSpec(0.25)
-    )
-    agent_config.action_space["strafe_right"] = habitat_sim.ActionSpec(
-        "strafe_right", StrafeActuationSpec(0.25)
-    )    
