@@ -1,5 +1,3 @@
-from habitat_sim import CameraSensorSpec
-from habitat_sim.agent.agent import ActionSpec
 from omegaconf import OmegaConf, MISSING
 from typing import Any, Dict, List, Tuple, Optional
 from dataclasses import asdict, dataclass, field
@@ -80,16 +78,28 @@ class SensorConfig:
     position: List[float] = None
     orientation: List[float] = None
 
-    def from_camera_sensor_spec(self, spec: CameraSensorSpec):
+    def from_camera_sensor_spec(self, spec: habitat_sim.CameraSensorSpec):
         # TODO:
         pass
 
 
+from habitat_sim.agent.agent import _default_action_space
+
+
 @dataclass
+class ActionParamsConfig:
+    # TODO: this way we can keep default values and override a subset through config
+    amount: float
+    
+@dataclass
+# TODO: handle multi-agent
 class AgentConfig:
-    action_space: Dict[
-        str, ActionSpec
-    ] = None  # field(default_factory=lambda: _default_agent_cfg['action_space'])
+    action_space: Dict[str, Any] = field(
+        default_factory=lambda: {
+            k: {"amount": v.actuation.amount}
+            for k, v in _default_action_space().items()
+        }
+    )
     angular_acceleration: float = None
     angular_friction: float = None
     body_type: str = None
@@ -102,8 +112,10 @@ class AgentConfig:
     sensor_specifications: List[SensorConfig] = field(default_factory=lambda: [])
 
     def __post_init__(self):
+        # TODO: how to disable default actions from config?
         for k in asdict(self):
-            setattr(self, k, _default_agent_cfg[k])
+            if k != "action_space":
+                setattr(self, k, _default_agent_cfg[k])
 
 
 @dataclass
@@ -124,7 +136,7 @@ class SceneConfig:
 
 @dataclass
 class TaskConfig:
-    name: str = ''
+    name: str = ""
     type: str = MISSING
 
 
@@ -147,7 +159,6 @@ class BaseConfig:
     task_iterator: TaskIteratorConfig = TaskIteratorConfig()
     scene: SceneConfig = SceneConfig()
     simulator: SimulatorConfig = SimulatorConfig()
-    # agent: Dict = field(default_factory=get_default_agent_cfg)
     agent: AgentConfig = AgentConfig()
 
 
@@ -201,8 +212,24 @@ class AvalancheConfig(object):
         # agent
         agent_cfg = habitat_sim.agent.AgentConfiguration()
         for k, v in self._config.agent.items():
-            setattr(agent_cfg, k, v)
+            if k == "action_space":
+                from avalanche_lab.registry import registry
 
+                # read registered action parameters and instatiate those specified in config
+                print("all", v)
+                for action_key, action_param_class in registry.get_all_action_params().items():
+                # for action_key, params in v.items():
+                    # TODO: How to merge with default values?
+                    params = v.get(action_key, {})
+                    print("key", action_key, "val", params, 'from registry', action_param_class)
+                    # action_param = registry.get_action_params(action_key)
+                    # default value merging carried out in `ActionParameters` subclasses
+                    agent_cfg.action_space[action_key] = habitat_sim.ActionSpec(
+                        action_key, action_param_class(**params)
+                    )
+            else:
+                setattr(agent_cfg, k, v)
+        # self.action_space['no_op'] = habitat_sim.ActionSpec('no_op', None)
         # FIXME: cant assign a CameraSensorSpec object to configuration
         # attach RGB visual sensor to the agent
         rgb_sensor_spec = habitat_sim.CameraSensorSpec()

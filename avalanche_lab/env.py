@@ -1,11 +1,13 @@
 from avalanche_lab.scene_manager import SceneManager
 from avalanche_lab.config import AvalancheConfig
 import gym
+import gym.spaces.dict
 from habitat_sim import Simulator
-from typing import List
-from avalanche_lab.tasks import Task, VoidTask
+from typing import List, Union
+from avalanche_lab.tasks import Task
 from avalanche_lab.task_collection import TaskCollection, TaskIterator
 import time
+import numpy as np
 
 
 class Env(gym.Env):
@@ -17,6 +19,7 @@ class Env(gym.Env):
     _action_counter: int = 0
     _episode_start_time: float = None
     _config: AvalancheConfig
+    _last_observation: gym.spaces.dict.Dict
 
     def __init__(self, config: AvalancheConfig) -> None:
         self.scene_manager = SceneManager(config)
@@ -44,11 +47,14 @@ class Env(gym.Env):
         # TODO: suppress output to console from sim if possible
         # reconfigure only on scene change
         if changed:
-            self.sim.reconfigure(AvalancheConfig.habitat_sim_config(self._config, scene))
-        obs = self.sim.reset()
-        return obs
+            self.sim.reconfigure(
+                AvalancheConfig.habitat_sim_config(self._config, scene)
+            )
+        self._last_observation = self.sim.reset()
+        return self._last_observation
 
-    def step(self, action, dt: float = 1 / 60):
+    # TODO: continuous actions spaces aren't supported with a nice api by the simulator yet
+    def step(self, action: Union[str, int], dt: float = 1 / 60):
         # The desired amount of time to advance the physical world.
         assert (
             self._episode_start_time is not None
@@ -56,22 +62,30 @@ class Env(gym.Env):
         assert (
             self._episode_over is False
         ), "Episode over, call reset before calling step"
+        # TODO: single-agent only for now
 
         # get current task
         task = self._get_task()
+        # filter valid action, dynamically define A(s), set of allowed actions at state s
+        action_key = action
+        if type(action) is int:
+            action_key = task.action_space_mapping(action)
 
-        # filter valid action (check tasks action space)
-
+        obs = self.sim.step(action_key, dt)
         # call reward function and goal test to construct observation
+        reward = task.reward_function(self._last_observation, obs, action)
+        self._last_observation = obs
+
+        # call goal_test to know whether we reached final configuration
+        self._episode_over = task.goal_test(obs)
 
         self._action_counter += 1
-
-        return self.sim.step(action, dt)
+        return obs, reward, self._episode_over, self.info
 
     def render(self, mode):
         return super().render(mode=mode)
 
-    def _get_task(self, is_reset: bool = False):
+    def _get_task(self, is_reset: bool = False) -> Task:
         task, changed = self.task_iterator.get_task(
             self._episode_counter, self._action_counter
         )
@@ -79,16 +93,24 @@ class Env(gym.Env):
         return task
 
     @property
-    def tasks(self):
+    def tasks(self) -> List[Task]:
         return self.task_iterator.tasks
 
     @property
+    def current_task(self) -> Task:
+        return self._get_task()
+
+    @property
     def action_space(self):
-        pass
+        return self.current_task.action_space
+
+    # @property
+    # def agent_action_space(self):
+    # return self._config.habitat_sim_config.agents[0].action_space
 
     @property
     def observation_space(self):
-        # TODO: merge of active tasks obs spaces. agent has bunch of sensors, 
+        # TODO: merge of active tasks obs spaces. agent has bunch of sensors,
         # but some task may require to only use a subset of them
         pass
 
@@ -99,6 +121,19 @@ class Env(gym.Env):
     @property
     def elapsed_time(self):
         return time.time() - self._episode_start_time
+
+    @property
+    def current_scene(self):
+        return self.scene_manager.current_scene
+
+    @property
+    def info(self):
+        return {
+            "episode_counter": self._episode_counter,
+            "action_counter": self._action_counter,
+            "elapsed_episode_time": self.elapsed_time,
+            "current_scene": self.current_scene,
+        }
 
     def seed(self, seed):
         return self.sim.seed(seed)

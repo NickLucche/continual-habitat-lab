@@ -1,9 +1,9 @@
 import habitat_sim
 from avalanche_lab.config import AvalancheConfig, TASK_SAMPLING, TASK_CHANGE_BEHAVIOR
-from avalanche_lab.tasks import Task
+from avalanche_lab.tasks import Task, VoidTask
 import logging
 from avalanche_lab.registry import registry
-from typing import List, Dict
+from typing import List, Dict, Tuple
 import numpy as np
 
 
@@ -90,6 +90,7 @@ class TaskIterator:
     _config: AvalancheConfig
     _task_change_behavior: TASK_CHANGE_BEHAVIOR
     _task_sampling: TASK_SAMPLING
+    _void_task: VoidTask = None
 
     # implement fixed and non-fixed timestep task change + sequential/random task sampling
     def __init__(self, config: AvalancheConfig, sim: habitat_sim.Simulator) -> None:
@@ -107,10 +108,13 @@ class TaskIterator:
                 self._config.task_iterator.task_change_timesteps_high,
             )
 
+        self._void_task = VoidTask(sim)
+
     # def __next__(self):
-    def get_task(self, episode_num: int, cumulative_steps: int):
+    def get_task(self, episode_num: int, cumulative_steps: int)->Tuple[Task, bool]:
+        # If no tasks are preset, defaults to VoidTask
         if len(self.tasks) == 0:
-            return None, False
+            return self._void_task, False
 
         # check whether we need to change active task
         change = self._change_task(episode_num, cumulative_steps)

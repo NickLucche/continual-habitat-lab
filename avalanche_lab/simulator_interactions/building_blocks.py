@@ -8,8 +8,12 @@ from habitat_sim.utils.common import quat_from_angle_axis, quat_rotate_vector
 
 # more at https://github.com/facebookresearch/habitat-sim/blob/master/examples/tutorials/new_actions.py
 # FIXME: this only works programatically for now
+# FIXME: register action, simply use habitat_sim registry 
 @dataclass
 class ActionParameters:
+    # specify default values here
+    # like so myparam: int = 2
+    action_key: str
     def __post_init__(self):
         # TODO: add current action parameters to configuration
         pass
@@ -45,9 +49,10 @@ def add_action(
 # We will define an action that moves the agent and turns it by some amount
 # First, define a class to keep the parameters of the control
 @dataclass
-class MoveAndSpinSpec:
-    forward_amount: float
-    spin_amount: float
+class MoveAndSpinSpec(ActionParameters):
+    action_key = 'fwd_and_spin'
+    forward_amount: float = 1.0
+    spin_amount: float = 30.
 
 # Register the control functor
 # This action will be an action that effects the body, so body_action=True

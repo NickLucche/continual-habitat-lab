@@ -48,7 +48,7 @@ if __name__ == "__main__":
             config.habitat_sim_config.agents[0].action_space.keys()
         )
         print("Available actions", action_names)
-        print(config.habitat_sim_config.agents[0].action_space)
+        print(config.habitat_sim_config.agents[0].action_space, type(config.habitat_sim_config.agents[0].action_space))
         print("Current scene:", env.scene_manager._current_scene)
         for _ in range(n_episodes):
             end = False
@@ -82,11 +82,11 @@ if __name__ == "__main__":
                     #     continue
                 else:
                     # execute random action
-                    # TODO: action = env.action_space.sample()
-                    action = random.choice(action_names)
+                    action = env.action_space.sample()
+                    # action = random.choice(action_names)
                 # env.step(env.action_space.sample())
                 print("action", action)
-                obs = env.step(action)
+                obs, reward, done, _ = env.step(action)
                 visualize(args.interactive, obs)
 
             if end:

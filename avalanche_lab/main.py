@@ -20,14 +20,19 @@ def make_simple_cfg(settings):
     rgb_sensor_spec.resolution = [settings["height"], settings["width"]]
     rgb_sensor_spec.position = [0.0, settings["sensor_height"], 0.0]
 
-    agent_cfg.sensor_specifications = [rgb_sensor_spec]
+    semantic_sensor_spec = habitat_sim.CameraSensorSpec()
+    semantic_sensor_spec.uuid = "semantic_sensor" # used for getting obs key 
+    semantic_sensor_spec.sensor_type = habitat_sim.SensorType.SEMANTIC
+    semantic_sensor_spec.resolution = [settings["height"], settings["width"]]
+    semantic_sensor_spec.position = [0.0, settings["sensor_height"], 0.0]
+
+    agent_cfg.sensor_specifications = [rgb_sensor_spec, semantic_sensor_spec]
 
     return habitat_sim.Configuration(sim_cfg, [agent_cfg])
 
 
 # This is the scene we are going to load.
 # we support a variety of mesh formats, such as .glb, .gltf, .obj, .ply
-# test_scene = "./data/scene_datasets/mp3d/17DRP5sb8fy/17DRP5sb8fy.glb"
 test_scene = "/home/nick/datasets/habitat/scene_dataset/mp3d/v1/tasks/mp3d/1LXtFkjw3qL/1LXtFkjw3qL_semantic.ply"
 
 sim_settings = {
@@ -62,11 +67,11 @@ while total_frames < max_frames:
     action = random.choice(action_names)
     print("action", action)
     observations = sim.step(action)
-    rgb = observations["color_sensor"]
-    # semantic = observations["semantic_sensor"]
+    # rgb = observations["color_sensor"]
+    semantic = observations["semantic_sensor"]
     # depth = observations["depth_sensor"]
-    print(rgb.shape)
-    plt.imshow(rgb)
+    print(semantic.shape)
+    plt.imshow(semantic)
     plt.show()
     total_frames += 1
 
