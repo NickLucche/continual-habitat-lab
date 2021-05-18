@@ -33,7 +33,7 @@ def make_simple_cfg(settings):
 
 # This is the scene we are going to load.
 # we support a variety of mesh formats, such as .glb, .gltf, .obj, .ply
-test_scene = "/home/nick/datasets/habitat/scene_dataset/mp3d/v1/tasks/mp3d/1LXtFkjw3qL/1LXtFkjw3qL_semantic.ply"
+test_scene = "/home/nick/datasets/habitat/gibson/gibson/Cokeville.glb"
 
 sim_settings = {
     "scene": test_scene,  # Scene path
@@ -44,36 +44,33 @@ sim_settings = {
 }
 cfg = make_simple_cfg(sim_settings)
 # create simulator
-sim = habitat_sim.Simulator(cfg)
-# init agent
-agent = sim.initialize_agent(sim_settings["default_agent"])
+with habitat_sim.Simulator(cfg) as sim:
+    # init agent
+    agent = sim.initialize_agent(sim_settings["default_agent"])
 
-# Set agent state
-agent_state = habitat_sim.AgentState()
-agent_state.position = np.array([-0.6, 0.0, 0.0])  # in world space
-agent.set_state(agent_state)
+    # Set agent state
+    agent_state = habitat_sim.AgentState()
+    agent_state.position = np.array([-0.6, 0.0, 0.0])  # in world space
+    agent.set_state(agent_state)
 
-# Get agent state
-agent_state = agent.get_state()
-print("agent_state: position", agent_state.position, "rotation", agent_state.rotation)
+    # Get agent state
+    agent_state = agent.get_state()
+    print("agent_state: position", agent_state.position, "rotation", agent_state.rotation)
 
-total_frames = 0
-action_names = list(cfg.agents[sim_settings["default_agent"]].action_space.keys())
+    total_frames = 0
+    action_names = list(cfg.agents[sim_settings["default_agent"]].action_space.keys())
 
-max_frames = 10
-import random
-import matplotlib.pyplot as plt
-while total_frames < max_frames:
-    action = random.choice(action_names)
-    print("action", action)
-    observations = sim.step(action)
-    # rgb = observations["color_sensor"]
-    semantic = observations["semantic_sensor"]
-    # depth = observations["depth_sensor"]
-    print(semantic.shape)
-    plt.imshow(semantic)
-    plt.show()
-    total_frames += 1
-
-# with
-sim.close()
+    max_frames = 10
+    import random
+    import matplotlib.pyplot as plt
+    while total_frames < max_frames:
+        action = random.choice(action_names)
+        print("action", action)
+        observations = sim.step(action)
+        obs = observations["color_sensor"]
+        # obs = observations["semantic_sensor"]
+        # depth = observations["depth_sensor"]
+        print(obs.shape)
+        plt.imshow(obs)
+        plt.show()
+        total_frames += 1

@@ -1,6 +1,6 @@
 from omegaconf import OmegaConf, MISSING
 from typing import Any, Dict, List, Tuple, Optional
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, make_dataclass
 import habitat_sim
 import enum
 
@@ -39,6 +39,24 @@ def get_default_agent_cfg() -> Dict:
 
 _default_sim_cg = get_default_sim_cfg()
 
+
+def make_dynamic_dataclass(class_name: str, base_class):
+    from avalanche_lab.registry import registry
+    import inspect
+    # TODO: substitute None defaults with some other value??
+    # TODO: issue with arguments with same name.
+    tasks_classes = registry.get_all("task")
+    signs = map(lambda C: inspect.getfullargspec(C.__init__), tasks_classes.values())
+    ignored_arguments = ["self", "sim"]
+
+    fields = []
+    for s in signs:
+        arg_counter = 0
+        for arg in s.args:
+            if arg not in ignored_arguments:
+                fields.append((arg, s.annotations[arg], s.defaults[arg_counter]))
+                arg_counter += 1
+    return make_dataclass(class_name, fields=fields, bases=(base_class,))
 
 @dataclass
 class SimulatorConfig:
@@ -90,7 +108,8 @@ from habitat_sim.agent.agent import _default_action_space
 class ActionParamsConfig:
     # TODO: this way we can keep default values and override a subset through config
     amount: float
-    
+
+
 @dataclass
 # TODO: handle multi-agent
 class AgentConfig:
@@ -139,7 +158,6 @@ class TaskConfig:
     name: str = ""
     type: str = MISSING
 
-
 @dataclass
 class TaskIteratorConfig:
     task_sampling: TASK_SAMPLING = TASK_SAMPLING.SEQUENTIAL
@@ -155,7 +173,10 @@ class TaskIteratorConfig:
 @dataclass
 class BaseConfig:
     experiment_name: str = "MyAvalanceExperiment"
-    tasks: List[TaskConfig] = field(default_factory=lambda: [])
+    # tasks is a special dataclass containing all init arguments defined when creating a task
+    tasks: List[make_dynamic_dataclass("Tasks", TaskConfig)] = field(
+        default_factory=lambda: []
+    )
     task_iterator: TaskIteratorConfig = TaskIteratorConfig()
     scene: SceneConfig = SceneConfig()
     simulator: SimulatorConfig = SimulatorConfig()
@@ -171,7 +192,7 @@ class AvalancheConfig(object):
     _agent_cfgs: List[habitat_sim.AgentConfiguration]
 
     def __init__(
-        self, config: OmegaConf = OmegaConf.create(), from_cli: bool = True
+        self, config: OmegaConf = OmegaConf.create(), from_cli: bool = False
     ) -> None:
         if from_cli:
             config = OmegaConf.merge(config, OmegaConf.from_cli())
@@ -217,11 +238,21 @@ class AvalancheConfig(object):
 
                 # read registered action parameters and instatiate those specified in config
                 print("all", v)
-                for action_key, action_param_class in registry.get_all_action_params().items():
-                # for action_key, params in v.items():
+                for (
+                    action_key,
+                    action_param_class,
+                ) in registry.get_all_action_params().items():
+                    # for action_key, params in v.items():
                     # TODO: How to merge with default values?
                     params = v.get(action_key, {})
-                    print("key", action_key, "val", params, 'from registry', action_param_class)
+                    print(
+                        "key",
+                        action_key,
+                        "val",
+                        params,
+                        "from registry",
+                        action_param_class,
+                    )
                     # action_param = registry.get_action_params(action_key)
                     # default value merging carried out in `ActionParameters` subclasses
                     agent_cfg.action_space[action_key] = habitat_sim.ActionSpec(

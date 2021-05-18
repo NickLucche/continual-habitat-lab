@@ -1,3 +1,4 @@
+from avalanche_lab.tasks.tasks import ObjectNav
 from omegaconf.omegaconf import OmegaConf
 from avalanche_lab.config import AvalancheConfig
 from avalanche_lab.env import Env
@@ -53,10 +54,12 @@ if __name__ == "__main__":
         for _ in range(n_episodes):
             end = False
             obs = env.reset()
-            print("Initial position", env.agent_position)
+            print("Initial position", env.agent_position)                
+
             visualize(args.interactive, obs)
             # assert env._curr_task_idx == task_idx, "Task should change at each new episode"
             task_idx = (task_idx + 1) % 2
+            step = 0
             while not env.done:
             # for i in range(3):
                 if args.interactive:
@@ -82,8 +85,12 @@ if __name__ == "__main__":
                     #     print("Invalid action!")
                     #     continue
                 else:
-                    # execute random action
-                    action = env.action_space.sample()
+                    # follow generated shortest path
+                    if isinstance(env.current_task, ObjectNav):
+                        action = env.current_task.goal.shortest_path[step]
+                    else:
+                        # execute random action
+                        action = env.action_space.sample()
                     # action = random.choice(action_names)
                 # env.step(env.action_space.sample())
                 print("action", action)
@@ -91,7 +98,7 @@ if __name__ == "__main__":
                 print(f"Reward: {reward}, done: {done}")
                 visualize(args.interactive, obs)
                 print("Current position", env.agent_position)
-
+                step += 1
             if end:
                 break
     cv2.destroyAllWindows()

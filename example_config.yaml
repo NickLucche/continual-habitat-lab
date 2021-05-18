@@ -8,7 +8,8 @@ agent:
       # name: 'some_name'
 tasks:
   - name: "MyTask"
-    type: "ObjectNav"
+    type: "VoidTask"
+    max_steps: 10
     # sensors: ['rgb']
 
 scene:

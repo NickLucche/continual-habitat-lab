@@ -28,3 +28,18 @@ def test_scene_change_every_ep():
             assert changed == True
         else:
             assert changed == False
+
+def test_gibson():
+    config = AvalancheConfig(from_cli=False)
+    # TODO: change
+    config.scene.dataset_paths = ['/home/nick/datasets/habitat/gibson/']
+    config.scene.max_scene_repeat_episodes = 1
+    skip_with_no_datasets(config)
+    sm = SceneManager(config)
+    # simulate simulator steps by increasing episode counter passed
+    for ep in range(10):
+        _, changed = sm.get_scene(ep)
+        if ep > 0:
+            assert changed == True
+        else:
+            assert changed == False

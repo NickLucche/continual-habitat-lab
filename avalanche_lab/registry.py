@@ -30,9 +30,6 @@ from habitat_sim.agent.agent import _default_action_space
 import collections
 from typing import Any, Callable, DefaultDict, Optional, Type, Dict, List
 
-from habitat_sim import ActionSpec
-from avalanche_lab.tasks.tasks import Task
-from habitat_sim.registry import _Registry
 import re
 
 def _camel_to_snake(name):
@@ -143,7 +140,7 @@ class AvalancheRegistry(metaclass=Singleton):
                 pass
 
         """
-
+        from avalanche_lab.tasks.tasks import Task
         return cls._register_impl(
             "task", to_register, name, assert_type=Task
         )
@@ -260,7 +257,7 @@ class AvalancheRegistry(metaclass=Singleton):
         return cls.mapping[_type].get(name, None)
 
     @classmethod
-    def get_task(cls, name: str) -> Type[Task]:
+    def get_task(cls, name: str) -> Type[Any]:
         return cls._get_impl("task", name)
 
     @classmethod
@@ -269,10 +266,14 @@ class AvalancheRegistry(metaclass=Singleton):
 
     @classmethod
     def get_all_action_params(cls) -> Dict[str, ActionParameters]:
-        return cls.mapping['action_params']
+        return cls.get_all('action_params')
 
     @classmethod
-    def get_move_fn(cls, name: str) -> Type[Task]:
+    def get_all(cls, key: str) -> Dict[str, Any]:
+        return cls.mapping[key]
+
+    @classmethod
+    def get_move_fn(cls, name: str) -> Type[Any]:
         return cls._get_impl("move_fn", name)
 
     # @classmethod

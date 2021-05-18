@@ -4,8 +4,8 @@ import gym
 import gym.spaces.dict
 from habitat_sim import Simulator
 from typing import List, Union
-from avalanche_lab.tasks import Task
-from avalanche_lab.task_collection import TaskCollection, TaskIterator
+from avalanche_lab.tasks.tasks import Task
+from avalanche_lab.task_collection.task_iterator import TaskIterator
 import time
 import numpy as np
 

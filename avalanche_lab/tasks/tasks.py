@@ -4,7 +4,6 @@ from habitat_sim import Simulator
 import gym.spaces.dict
 import gym.spaces.discrete
 from gym.spaces.space import Space
-from habitat_sim.registry import registry
 import logging
 import numpy as np
 import enum
@@ -16,11 +15,13 @@ class Task:
     # action and obs space as defined by OpenAI Gym
     action_space = gym.spaces.discrete.Discrete(3)
     # observation_space: Space TODO: ignore for now
+    name: str
 
-    def __init__(self, sim: Simulator) -> None:
+    def __init__(self, sim: Simulator, name:str=None, *args, **kwargs) -> None:
         self.sim = sim
         actions_key = ["turn_right", "turn_left", "move_forward"]
         self._action_space_map = {str(i): actions_key[i] for i in range(3)}
+        self.name = self.__class__.__name__ if name is None else name
 
     def goal_test(self, obs: gym.spaces.dict.Dict) -> bool:
         raise NotImplementedError()
@@ -46,9 +47,9 @@ class Task:
         return self._action_space_map[str(action)]
 
 
-from avalanche_lab.registry import registry
+from avalanche_lab.registry import AvalancheRegistry
 import habitat_sim
-
+registry = AvalancheRegistry()
 
 @habitat_sim.registry.register_move_fn(body_action=False)
 class NoOp(habitat_sim.SceneNodeControl):
@@ -60,19 +61,23 @@ class NoOp(habitat_sim.SceneNodeControl):
 class NoOpSpec:
     action_key: str = "no_op"
 
-
+# Signatures are important: use max_steps: np.float=np.float('inf') as :int=np.float('inf') 
+# will eval to None and that doesnt go well with config system
 @registry.register_task
 class VoidTask(Task):
     reward_range = (0.0, 0.0)
     action_space = gym.spaces.discrete.Discrete(4)
-
-    def __init__(self, sim: Simulator) -> None:
-        super().__init__(sim)
+    steps: int = 0
+    # add args kwargs to avoid rasing errors when random keywords are passed from config
+    def __init__(self, sim: Simulator, max_steps: int=100, *args, **kwargs) -> None:
+        super().__init__(sim, *args, **kwargs)
+        self.max_steps = max_steps
         actions_key = ["no_op", "turn_right", "turn_left", "move_forward"]
         self._action_space_map = {str(i): actions_key[i] for i in range(4)}
 
     def goal_test(self, obs: gym.spaces.dict.Dict) -> bool:
-        return False
+        self.steps += 1
+        return False if self.steps < self.max_steps else True
 
     def reward_function(
         self, prev_obs: gym.spaces.dict.Dict, curr_obs: gym.spaces.dict.Dict, action
@@ -98,7 +103,9 @@ class Difficulty(enum.IntEnum):
 
 from avalanche_lab.tasks.navigation import *
 from collections import deque
-
+# all tasks arguments MUST have defaults in order to be passed 
+# on to the configuration system. Also, make sure to register task before 
+# creating a config
 @registry.register_task
 class ObjectNav(Task):
     difficulty: Difficulty
@@ -107,18 +114,19 @@ class ObjectNav(Task):
     def __init__(
         self,
         sim: Simulator,
-        object_asset: str = None,
+        object_asset: str = '',
         difficulty: Difficulty = Difficulty.NORMAL,
         pre_compute_episodes: int = 1,
         keep_goal_fixed: bool = False,
-        goal_tollerance: float = .5
+        goal_tollerance: float = .5,
+        *args, **kwargs
     ) -> None:
-        super().__init__(sim)
+        super().__init__(sim, *args, **kwargs)
         self.sim = sim
         self.difficulty = difficulty
         self.keep_goal_fixed = keep_goal_fixed
         self.n_episodes = pre_compute_episodes
-        self.goals = deque()
+        self.goals = []
         self.tollerance = goal_tollerance
 
     def on_new_episode(self):
@@ -130,26 +138,23 @@ class ObjectNav(Task):
         pass
 
     def _generate_goal(self):
-        agent = self.sim.get_agent(0)
-        # TODO: generate from current position?
-        agent_state = agent.get_state()
-        original_pos = agent_state.position
-        self.goal = generate_pointnav_episode(
-            self.sim,
-            agent_state.position,
-            number_of_episodes=self.n_episodes,
-            geodesic_to_euclid_starting_ratio=self.difficulty.value,
-        )
-        print(original_pos, self.sim.get_agent(0).get_state().position)
-        assert np.linalg.norm(original_pos-self.sim.get_agent(0).get_state().position)<.9
-        if self.goal is None:
-            # TODO: Fallback to random point?
-            raise Exception("Can't generate new goal")
+        if not len(self.goals):
+            agent = self.sim.get_agent(0)
+            # TODO: generate from current position?
+            agent_state = agent.get_state()
+            original_pos = agent_state.position
+            self.goals = generate_pointnav_episode(
+                self.sim,
+                agent_state.position,
+                number_of_episodes=self.n_episodes,
+                geodesic_to_euclid_starting_ratio=self.difficulty.value,
+            )
+            if self.goals is None:
+                # TODO: Fallback to random point?
+                raise Exception("Can't generate new goal")
+            
+        self.goal = self.goals.pop()
         print("GOAL", self.goal)
-        # TODO:
-        # self.goals.append(list(goals))
-        # self.goal = self.goals.pop()
-        # self.goal = list(goals)[0]
 
     def goal_test(self, obs: gym.spaces.dict.Dict) -> bool:
         # TODO: check if observation space contains agent's position

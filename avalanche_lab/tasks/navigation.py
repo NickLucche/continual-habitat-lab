@@ -5,8 +5,11 @@ import logging
 from habitat_sim.nav import GreedyGeodesicFollower
 from habitat_sim.errors import GreedyFollowerError
 from dataclasses import dataclass
+
 # adapted from https://github.com/facebookresearch/habitat-lab/blob/master/habitat/datasets/pointnav/pointnav_generator.py
 ISLAND_RADIUS_LIMIT = 1.5
+
+
 @dataclass
 class NavigationGoal:
     source_position: np.ndarray
@@ -14,6 +17,8 @@ class NavigationGoal:
     goal_position: np.ndarray
     shortest_path: List[str]
     geodesic_distance: float
+    _num_iterations_to_find: int = None
+
 
 def get_shortest_path_actions(
     sim: habitat_sim.Simulator,
@@ -96,7 +101,7 @@ def is_compatible_episode(
     if not further_than <= dist <= closer_than:
         return False, dist
     distances_ratio = dist / euclid_dist
-
+    # print("ratio", distances_ratio)
     if distances_ratio < geodesic_to_euclid_ratio:
         return False, dist
     return True, dist
@@ -111,7 +116,7 @@ def generate_pointnav_episode(
     closest_dist_limit: float = 1,
     furthest_dist_limit: float = 50,
     geodesic_to_euclid_starting_ratio: float = 2.0,
-    geodesic_to_euclid_min_ratio: float = 1.1,
+    geodesic_to_euclid_min_ratio: float = 1.0,
     number_retries_per_target: int = 10,
 ) -> Generator[NavigationGoal, None, None]:
     r"""Generator function that generates PointGoal navigation episodes.
@@ -145,81 +150,96 @@ def generate_pointnav_episode(
     :return: navigation episode that satisfy specified distribution for
     currently loaded into simulator scene.
     """
-    MAX_RETRIES = 20
+    MAX_SOURCE_SAMPLING = 10
 
     gte_ratios = np.linspace(
         geodesic_to_euclid_starting_ratio,
         geodesic_to_euclid_min_ratio,
         number_retries_per_target,
     )
+    
+    # gte_ratios[:number_retries_per_target//5] = gte_ratios[0]
+    # gte_ratios[-number_retries_per_target//5:] = gte_ratios[-1]
+    goals = []
     for ep in range(number_of_episodes):
-        for i in range(MAX_RETRIES):
-            # query NavMesh navigable area using PathFinder API
-            if not sim.pathfinder.is_loaded:
-                raise Exception(
-                    "Pathfinder not initialized, unable to sample navigable points."
-                )
-            pathfinder = sim.pathfinder
-            # first sample source position if not given
-            source_position = (
-                pathfinder.get_random_navigable_point()
-                if agent_position is None
-                else agent_position
+        # query NavMesh navigable area using PathFinder API
+        if not sim.pathfinder.is_loaded:
+            raise Exception(
+                "Pathfinder not initialized, unable to sample navigable points."
             )
-            print("source", source_position)
+        pathfinder = sim.pathfinder
+        found = False
+        if agent_position is None:
+            for i in range(MAX_SOURCE_SAMPLING):
+                # first sample source position if not given
+                source_position = pathfinder.get_random_navigable_point()
+                # print("source", source_position)
 
-            # make sure sampled point is in some 'interesting area' greater than some threshold
-            # e.g. avoid sampling a point on top of some other scene object
-            if (
-                agent_position is None
-                and pathfinder.island_radius(source_position) < ISLAND_RADIUS_LIMIT
-            ):
-                continue
-            # then sample object goal position making sure "it's not too easy" or undoable
-            for _retry in range(number_retries_per_target):
-                # try multiple times, starting with a high `geodesic_to_euclid_ratio` and
-                # linearly decreasing it up to `geodesic_to_euclid_ratio_min` (~min episode difficulty)
-                target_position = pathfinder.get_random_navigable_point()
-                # FIXME:if sim.pathfinder.island_radius(target_position) < ISLAND_RADIUS_LIMIT:
-                    # continue
-                print("target pos", target_position)
-
-                is_compatible, dist = is_compatible_episode(
-                    source_position,
-                    target_position,
-                    sim,
-                    further_than=closest_dist_limit,
-                    closer_than=furthest_dist_limit,
-                    geodesic_to_euclid_ratio=gte_ratios[_retry],
-                )
-                print("distance returned", dist)
-                if is_compatible:
+                # make sure sampled point is in some 'interesting area' greater than some threshold
+                # e.g. avoid sampling a point on top of some other scene object
+                if (
+                    agent_position is None
+                    and pathfinder.island_radius(source_position) < ISLAND_RADIUS_LIMIT
+                ):
+                    continue
+                else:
+                    found = True
                     break
-            if is_compatible:
-                # sample random orientation
-                angle = np.random.uniform(0, 2 * np.pi)
-                source_rotation = [0, np.sin(angle / 2), 0, np.cos(angle / 2)]
-                # have a shortest path agent try and traverse the path, useful to compute
-                # reward based on best trajectory
-                shortest_paths = None
-                if generate_shortest_path:
-                    shortest_paths = get_shortest_path_actions(
-                        sim,
-                        source_position=source_position,
-                        source_rotation=source_rotation,
-                        goal_position=target_position,
-                        success_distance=shortest_path_success_distance,
-                    )
+            if not found:
+                logging.error("Unable to sample valid starting position")
+                return None
+        else:
+            source_position = agent_position
+            
+        # then sample object goal position making sure "it's not too easy" or undoable
+        for _retry in range(number_retries_per_target):
+            # try multiple times, starting with a high `geodesic_to_euclid_ratio` and
+            # ~linearly decreasing it up to `geodesic_to_euclid_ratio_min` (~min episode difficulty)
+            target_position = pathfinder.get_random_navigable_point()
+            # FIXME:if sim.pathfinder.island_radius(target_position) < ISLAND_RADIUS_LIMIT:
+            # continue
+            # print("target pos", target_position)
 
-                return NavigationGoal(
+            is_compatible, dist = is_compatible_episode(
+                source_position,
+                target_position,
+                sim,
+                further_than=closest_dist_limit,
+                closer_than=furthest_dist_limit,
+                geodesic_to_euclid_ratio=gte_ratios[_retry],
+            )
+            # print("distance returned", dist, "current gte", gte_ratios[_retry])
+            if is_compatible:
+                break
+        if is_compatible:
+            # sample random orientation
+            angle = np.random.uniform(0, 2 * np.pi)
+            source_rotation = [0, np.sin(angle / 2), 0, np.cos(angle / 2)]
+            # have a shortest path agent try and traverse the path, useful to compute
+            # reward based on best trajectory
+            shortest_paths = None
+            if generate_shortest_path:
+                shortest_paths = get_shortest_path_actions(
+                    sim,
+                    source_position=source_position,
+                    source_rotation=source_rotation,
+                    goal_position=target_position,
+                    success_distance=shortest_path_success_distance,
+                )
+
+            goals.append(
+                NavigationGoal(
                     source_position,
                     source_rotation,
                     target_position,
                     shortest_paths,
                     dist,
+                    _num_iterations_to_find=_retry,
                 )
+            )
+        else:
             logging.error(
                 f"Unable to generate a path for current scene with provided configuration (min dist: {closest_dist_limit}, max dist: {furthest_dist_limit}, min gte ratio: {geodesic_to_euclid_min_ratio})"
             )
-            return None
+    return goals
 
