@@ -1,5 +1,5 @@
 from avalanche_lab.config import AvalancheConfig
-from avalanche_lab.env import Env
+from avalanche_lab.env import AvalancheEnv
 import pytest
 import numpy as np
 import matplotlib.pyplot as plt
@@ -8,7 +8,7 @@ import os, sys
 sys.path.insert(0, "/home/nick/uni/thesis/avalanche-lab/")
 
 config = AvalancheConfig(from_cli=True)
-with Env(config) as env:
+with AvalancheEnv(config) as env:
     # we have two tasks, we'll only need task index 0 and 1
     task_idx = 0
     action_names = list(

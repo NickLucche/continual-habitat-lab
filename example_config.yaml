@@ -2,7 +2,8 @@ simulator:
   random_seed: 7
 agent:
   height: 1.4
-  # sensor: ['rgb', 'depth']
+  sensor_specifications:
+    - type: RGB
   # action_space:
     # move_forward:
       # name: 'some_name'

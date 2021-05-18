@@ -196,8 +196,8 @@ def generate_pointnav_episode(
             # try multiple times, starting with a high `geodesic_to_euclid_ratio` and
             # ~linearly decreasing it up to `geodesic_to_euclid_ratio_min` (~min episode difficulty)
             target_position = pathfinder.get_random_navigable_point()
-            # FIXME:if sim.pathfinder.island_radius(target_position) < ISLAND_RADIUS_LIMIT:
-            # continue
+            if sim.pathfinder.island_radius(target_position) < ISLAND_RADIUS_LIMIT:
+                continue
             # print("target pos", target_position)
 
             is_compatible, dist = is_compatible_episode(

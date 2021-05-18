@@ -10,7 +10,7 @@ import time
 import numpy as np
 
 
-class Env(gym.Env):
+class AvalancheEnv(gym.Env):
     sim: Simulator
     task_iterator: TaskIterator
     scene_manager: SceneManager
@@ -40,17 +40,20 @@ class Env(gym.Env):
         self._episode_counter += 1
         # task may change on new episode
         task = self._get_task(is_reset=True)
-        task.on_new_episode()
 
         # scene may also change on new episode
-        scene, changed = self.scene_manager.get_scene(self._episode_counter)
+        scene, scene_changed = self.scene_manager.get_scene(self._episode_counter)
 
         # TODO: suppress output to console from sim if possible
         # reconfigure only on scene change
-        if changed:
+        if scene_changed:
             self.sim.reconfigure(
                 AvalancheConfig.habitat_sim_config(self._config, scene)
             )
+            self.current_task.on_scene_change()
+
+        task.on_new_episode()
+
         self._last_observation = self.sim.reset()
         return self._last_observation
 

@@ -1,4 +1,5 @@
 from omegaconf import OmegaConf, MISSING
+import omegaconf
 from typing import Any, Dict, List, Tuple, Optional
 from dataclasses import asdict, dataclass, field, make_dataclass
 import habitat_sim
@@ -43,6 +44,7 @@ _default_sim_cg = get_default_sim_cfg()
 def make_dynamic_dataclass(class_name: str, base_class):
     from avalanche_lab.registry import registry
     import inspect
+
     # TODO: substitute None defaults with some other value??
     # TODO: issue with arguments with same name.
     tasks_classes = registry.get_all("task")
@@ -57,6 +59,7 @@ def make_dynamic_dataclass(class_name: str, base_class):
                 fields.append((arg, s.annotations[arg], s.defaults[arg_counter]))
                 arg_counter += 1
     return make_dataclass(class_name, fields=fields, bases=(base_class,))
+
 
 @dataclass
 class SimulatorConfig:
@@ -86,15 +89,25 @@ class SimulatorConfig:
 _default_agent_cfg = get_default_agent_cfg()
 
 
+class Sensors(enum.IntEnum):
+    RGB = 0
+    DEPTH = 1
+    SEMANTIC = 2
+    RGBA = 3
+    GPS = 4
+
+
 @dataclass
 class SensorConfig:
-    uuid: str = None
-    sensor_type: habitat_sim.SensorType = None
-    sensor_subtype: habitat_sim.SensorSubType = None
-    parameters: Dict[str, str] = None
-    resolution: List[float] = None
-    position: List[float] = None
-    orientation: List[float] = None
+    # way to quickly setup sensors with good defaults
+    type: Sensors = Sensors.RGB
+    uuid: str = ""
+    # sensor_type: habitat_sim.SensorType = habitat_sim.SensorType.COLOR
+    # sensor_subtype: habitat_sim.SensorSubType = habitat_sim.SensorSubType.NONE
+    parameters: Optional[Dict[str, str]] = None
+    resolution: List[float] = field(default_factory=lambda: [128, 128])
+    position: List[float] = field(default_factory=lambda: [0.0, 1.5, 0])
+    orientation: List[float] = field(default_factory=lambda: [0.0, 0.0, 0.0])
 
     def from_camera_sensor_spec(self, spec: habitat_sim.CameraSensorSpec):
         # TODO:
@@ -128,12 +141,12 @@ class AgentConfig:
     linear_friction: float = None
     mass: float = None
     radius: float = None
-    sensor_specifications: List[SensorConfig] = field(default_factory=lambda: [])
+    sensor_specifications: List[SensorConfig] = field(default_factory=lambda: [SensorConfig()])
 
     def __post_init__(self):
         # TODO: how to disable default actions from config?
         for k in asdict(self):
-            if k != "action_space":
+            if k not in ["action_space", 'sensor_specifications']:
                 setattr(self, k, _default_agent_cfg[k])
 
 
@@ -157,6 +170,7 @@ class SceneConfig:
 class TaskConfig:
     name: str = ""
     type: str = MISSING
+
 
 @dataclass
 class TaskIteratorConfig:
@@ -253,22 +267,46 @@ class AvalancheConfig(object):
                         "from registry",
                         action_param_class,
                     )
-                    # action_param = registry.get_action_params(action_key)
                     # default value merging carried out in `ActionParameters` subclasses
                     agent_cfg.action_space[action_key] = habitat_sim.ActionSpec(
                         action_key, action_param_class(**params)
                     )
+            elif k == "sensor_specifications":
+                sensors = list(map(lambda sc: self._create_sensor(sc), v))
+                print("SENSORS", sensors)
+                agent_cfg.sensor_specifications = sensors
             else:
                 setattr(agent_cfg, k, v)
-        # self.action_space['no_op'] = habitat_sim.ActionSpec('no_op', None)
+
         # FIXME: cant assign a CameraSensorSpec object to configuration
         # attach RGB visual sensor to the agent
-        rgb_sensor_spec = habitat_sim.CameraSensorSpec()
-        rgb_sensor_spec.uuid = "rgb"
-        rgb_sensor_spec.sensor_type = habitat_sim.SensorType.COLOR
-        rgb_sensor_spec.resolution = [512, 512]
-        rgb_sensor_spec.position = [0.0, 2.0, 0.0]
-        # config.agent.sensor_specifications = [rgb_sensor_spec]
-        agent_cfg.sensor_specifications = [rgb_sensor_spec]
+        # rgb_sensor_spec = habitat_sim.CameraSensorSpec()
+        # rgb_sensor_spec.uuid = "rgb"
+        # rgb_sensor_spec.sensor_type = habitat_sim.SensorType.COLOR
+        # rgb_sensor_spec.resolution = [512, 512]
+        # rgb_sensor_spec.position = [0.0, 2.0, 0.0]
+        # # config.agent.sensor_specifications = [rgb_sensor_spec]
+        # agent_cfg.sensor_specifications = [rgb_sensor_spec]
         self._agent_cfgs = [agent_cfg]
+
+    def _create_sensor(self, sensor_spec: SensorConfig):
+        def _create_camera(spec_dict:omegaconf.dictconfig.DictConfig, sensor_type: habitat_sim.SensorType):
+            # spec_dict = asdict(spec)
+            type_ = spec_dict["type"]
+            if spec_dict["uuid"].strip() == "":
+                spec_dict["uuid"] = type_.name.lower()
+            camera = habitat_sim.CameraSensorSpec()
+            # set it by default
+            camera.sensor_type = sensor_type
+            for k, v in spec_dict.items():
+                if k != 'type':
+                    setattr(camera, k, v)
+            return camera
+
+        if sensor_spec.type == Sensors.RGB:
+            return _create_camera(sensor_spec, habitat_sim.SensorType.COLOR)
+        elif sensor_spec.type == Sensors.SEMANTIC:
+            return _create_camera(sensor_spec, habitat_sim.SensorType.SEMANTIC)
+        elif sensor_spec.type == Sensors.DEPTH:
+            return _create_camera(sensor_spec, habitat_sim.SensorType.DEPTH)
 

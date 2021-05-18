@@ -37,6 +37,9 @@ class Task:
     def on_new_episode(self):
         pass
 
+    def on_scene_change(self):
+        pass
+
     def action_space_mapping(self, action: int) -> str:
         # map task's actions to `habitat_sim` actions_key, implementing A(s) using habitat_sim registry
         # override to assign custom meaning to your action space or simply to change order of actions
@@ -96,13 +99,13 @@ class VoidTask(Task):
 
 
 class Difficulty(enum.IntEnum):
-    EASY = 1.1
-    NORMAL = 1.4
-    HARD = 2.0
+    TRIVIAL = 1.0
+    EASY = 1.5
+    NORMAL = 2.
+    HARD = 3.0
 
 
 from avalanche_lab.tasks.navigation import *
-from collections import deque
 # all tasks arguments MUST have defaults in order to be passed 
 # on to the configuration system. Also, make sure to register task before 
 # creating a config
@@ -137,12 +140,15 @@ class ObjectNav(Task):
         # return self.on_new_episode()
         pass
 
+    def on_scene_change(self):
+        # new scene, invalidate generated goals
+        self.goals = []
+
     def _generate_goal(self):
         if not len(self.goals):
             agent = self.sim.get_agent(0)
             # TODO: generate from current position?
             agent_state = agent.get_state()
-            original_pos = agent_state.position
             self.goals = generate_pointnav_episode(
                 self.sim,
                 agent_state.position,
@@ -154,7 +160,6 @@ class ObjectNav(Task):
                 raise Exception("Can't generate new goal")
             
         self.goal = self.goals.pop()
-        print("GOAL", self.goal)
 
     def goal_test(self, obs: gym.spaces.dict.Dict) -> bool:
         # TODO: check if observation space contains agent's position

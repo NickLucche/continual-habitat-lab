@@ -1,7 +1,7 @@
 from avalanche_lab.tasks.tasks import ObjectNav
 from omegaconf.omegaconf import OmegaConf
 from avalanche_lab.config import AvalancheConfig
-from avalanche_lab.env import Env
+from avalanche_lab.env import AvalancheEnv
 import pytest
 import numpy as np
 import matplotlib.pyplot as plt
@@ -43,7 +43,7 @@ if __name__ == "__main__":
 
 
     print("Simulator configuration:\n", OmegaConf.to_yaml(config._config) )
-    with Env(config) as env:
+    with AvalancheEnv(config) as env:
         task_idx = 0
         action_names = list(
             config.habitat_sim_config.agents[0].action_space.keys()
