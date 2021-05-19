@@ -4,6 +4,8 @@ agent:
   height: 1.4
   sensor_specifications:
     - type: RGB
+      resolution: [512, 512]
+    # - type: SEMANTIC
   # action_space:
     # move_forward:
       # name: 'some_name'
@@ -11,7 +13,7 @@ tasks:
   - name: "MyTask"
     type: "VoidTask"
     max_steps: 10
-    # sensors: ['rgb']
 
 scene:
-  dataset_paths: ['data/scene_datasets/habitat-test-scenes/']
+  # dataset_paths: ['data/scene_datasets/habitat-test-scenes/']
+  dataset_paths: ['/home/nick/datasets/habitat/gibson/gibson/']

@@ -78,6 +78,9 @@ class VoidTask(Task):
         actions_key = ["no_op", "turn_right", "turn_left", "move_forward"]
         self._action_space_map = {str(i): actions_key[i] for i in range(4)}
 
+    def on_new_episode(self):
+        self.steps = 0
+        
     def goal_test(self, obs: gym.spaces.dict.Dict) -> bool:
         self.steps += 1
         return False if self.steps < self.max_steps else True

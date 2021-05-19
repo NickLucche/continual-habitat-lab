@@ -48,6 +48,7 @@ def make_dynamic_dataclass(class_name: str, base_class):
     # TODO: substitute None defaults with some other value??
     # TODO: issue with arguments with same name.
     tasks_classes = registry.get_all("task")
+    print("tasks classes", tasks_classes)
     signs = map(lambda C: inspect.getfullargspec(C.__init__), tasks_classes.values())
     ignored_arguments = ["self", "sim"]
 
@@ -58,6 +59,7 @@ def make_dynamic_dataclass(class_name: str, base_class):
             if arg not in ignored_arguments:
                 fields.append((arg, s.annotations[arg], s.defaults[arg_counter]))
                 arg_counter += 1
+    print("Tasks fields", fields)
     return make_dataclass(class_name, fields=fields, bases=(base_class,))
 
 
@@ -103,9 +105,9 @@ class SensorConfig:
     type: Sensors = Sensors.RGB
     uuid: str = ""
     # sensor_type: habitat_sim.SensorType = habitat_sim.SensorType.COLOR
-    # sensor_subtype: habitat_sim.SensorSubType = habitat_sim.SensorSubType.NONE
+    # sensor_subtype: habitat_sim.SensorSubType = habitat_sim.SensorSubType.PINHOLE
     parameters: Optional[Dict[str, str]] = None
-    resolution: List[float] = field(default_factory=lambda: [128, 128])
+    resolution: List[int] = field(default_factory=lambda: [128, 128])
     position: List[float] = field(default_factory=lambda: [0.0, 1.5, 0])
     orientation: List[float] = field(default_factory=lambda: [0.0, 0.0, 0.0])
 
@@ -141,12 +143,14 @@ class AgentConfig:
     linear_friction: float = None
     mass: float = None
     radius: float = None
-    sensor_specifications: List[SensorConfig] = field(default_factory=lambda: [SensorConfig()])
+    sensor_specifications: List[SensorConfig] = field(
+        default_factory=lambda: [SensorConfig()]
+    )
 
     def __post_init__(self):
         # TODO: how to disable default actions from config?
         for k in asdict(self):
-            if k not in ["action_space", 'sensor_specifications']:
+            if k not in ["action_space", "sensor_specifications"]:
                 setattr(self, k, _default_agent_cfg[k])
 
 
@@ -156,6 +160,8 @@ class SceneConfig:
     dataset_paths: List[str] = field(
         default_factory=lambda: ["data/scene_datasets/habitat-test-scenes/"]
     )
+    # if set inhibits SceneManager behavior and only returns this single scene specified
+    scene_path: Optional[str] = None
     split_dataset_subdirectories: bool = False
     max_scene_repeat_episodes: int = -1
     # cycle datasets, can't move to other dataset before all scenes have been selected
@@ -184,23 +190,12 @@ class TaskIteratorConfig:
     task_change_timesteps_high: int = -1
 
 
-@dataclass
-class BaseConfig:
-    experiment_name: str = "MyAvalanceExperiment"
-    # tasks is a special dataclass containing all init arguments defined when creating a task
-    tasks: List[make_dynamic_dataclass("Tasks", TaskConfig)] = field(
-        default_factory=lambda: []
-    )
-    task_iterator: TaskIteratorConfig = TaskIteratorConfig()
-    scene: SceneConfig = SceneConfig()
-    simulator: SimulatorConfig = SimulatorConfig()
-    agent: AgentConfig = AgentConfig()
 
-
-base_config = OmegaConf.structured(BaseConfig)
 
 
 class AvalancheConfig(object):
+
+
     _config: OmegaConf
     _sim_cfg: habitat_sim.SimulatorConfiguration
     _agent_cfgs: List[habitat_sim.AgentConfiguration]
@@ -208,6 +203,33 @@ class AvalancheConfig(object):
     def __init__(
         self, config: OmegaConf = OmegaConf.create(), from_cli: bool = False
     ) -> None:
+        # workaround to get dynamic `Tasks` dataclass to be evaluated at config
+        # instatiation time rather than import time (solve import order bug) 
+        @dataclass
+        class BaseConfig:
+            experiment_name: str = "MyAvalanceExperiment"
+            # tasks is a special dataclass containing all init arguments defined when creating a task
+            tasks: List[make_dynamic_dataclass("Tasks", TaskConfig)] = field(
+            default_factory=lambda: []
+            )
+            task_iterator: TaskIteratorConfig = TaskIteratorConfig()
+            scene: SceneConfig = SceneConfig()
+            simulator: SimulatorConfig = SimulatorConfig()
+            agent: AgentConfig = AgentConfig()
+        
+        # Base = make_dataclass(
+        #     "Base",
+        #     fields=[
+        #         (
+        #             "tasks",
+        #             List[make_dynamic_dataclass("Tasks", TaskConfig)],
+        #             field(default_factory=lambda: []),
+        #         )
+        #     ],
+        #     bases=(self.BaseConfig,),
+        # )
+        base_config = OmegaConf.structured(BaseConfig)
+
         if from_cli:
             config = OmegaConf.merge(config, OmegaConf.from_cli())
         self._config = OmegaConf.merge(base_config, config)
@@ -221,10 +243,16 @@ class AvalancheConfig(object):
     def habitat_sim_config(self):
         # When we edit simulator or agent habitat sim config, avalanche config
         # should be updated as well, therefore we re-instantiate it
-        self._override_habitat_sim_config()
+        # self._override_habitat_sim_config()
         return habitat_sim.Configuration(self._sim_cfg, self._agent_cfgs)
+    
+    def refresh_config(self):
+        return self._override_habitat_sim_config()
 
     def make_habitat_sim_config(self, scene: str):
+        # we need to re-instatiate the habitat-sim configuration or the simulator 
+        # won't recognize differences with previous object
+        self._override_habitat_sim_config()
         self._sim_cfg.scene_id = scene
         return habitat_sim.Configuration(self._sim_cfg, self._agent_cfgs)
 
@@ -290,7 +318,10 @@ class AvalancheConfig(object):
         self._agent_cfgs = [agent_cfg]
 
     def _create_sensor(self, sensor_spec: SensorConfig):
-        def _create_camera(spec_dict:omegaconf.dictconfig.DictConfig, sensor_type: habitat_sim.SensorType):
+        def _create_camera(
+            spec_dict: omegaconf.dictconfig.DictConfig,
+            sensor_type: habitat_sim.SensorType,
+        ):
             # spec_dict = asdict(spec)
             type_ = spec_dict["type"]
             if spec_dict["uuid"].strip() == "":
@@ -298,8 +329,10 @@ class AvalancheConfig(object):
             camera = habitat_sim.CameraSensorSpec()
             # set it by default
             camera.sensor_type = sensor_type
+            # camera.sensor_subtype = habitat_sim.SensorSubType.PINHOLE
+            
             for k, v in spec_dict.items():
-                if k != 'type':
+                if k != "type":
                     setattr(camera, k, v)
             return camera
 

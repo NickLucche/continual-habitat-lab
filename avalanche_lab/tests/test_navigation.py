@@ -55,4 +55,6 @@ def test_difficulties_episode_gen(gte_ratio, min_gte_ratio, diff: int):
             )
             # assert it wasnt too hard finding it
             assert ep._num_iterations_to_find <= num_iterations[diff]
+            # assert path not empty
+            assert ep.shortest_path is not None
 

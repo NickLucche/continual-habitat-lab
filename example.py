@@ -20,12 +20,27 @@ FINISH = "f"
 
 
 # def rgb2bgr(image):
-    # return image[..., ::-1]
+# return image[..., ::-1]
 
 
 def visualize(flag: bool, obs):
     if flag:
-        cv2.imshow("RGB", obs["rgb"])
+        img = obs["rgb"]
+        if "semantic" in obs and obs["semantic"].shape[0] == img.shape[0]:
+            # this may merge some classes
+            sem = (obs['semantic']/obs['semantic'].max()).astype(np.uint8)
+            print(sem.max(), sem.min(), sem.dtype)
+            print(img.max(), img.min(), img.dtype)
+            # rgb sensor returns 4 channels by default (rgba)
+            img = np.hstack(
+                [
+                    img,
+                    np.zeros((img.shape[0], 2, 4)),
+                    obs["semantic"][:, :, np.newaxis].repeat(4, axis=2),
+                ]
+            )
+            print('img shape', img.shape)
+        cv2.imshow("RGB", img)
 
 
 if __name__ == "__main__":
@@ -36,32 +51,31 @@ if __name__ == "__main__":
     args = args.parse_args()
     n_episodes = 3
 
-
     # config = AvalancheConfig(from_cli=False)
-    config = AvalancheConfig.from_yaml('example_config.yaml')
-    config.scene.max_scene_repeat_episodes = -1
+    config = AvalancheConfig.from_yaml("example_config.yaml")
+    config.scene.max_scene_repeat_episodes = 1
 
-
-    print("Simulator configuration:\n", OmegaConf.to_yaml(config._config) )
+    print("Simulator configuration:\n", OmegaConf.to_yaml(config._config))
     with AvalancheEnv(config) as env:
         task_idx = 0
-        action_names = list(
-            config.habitat_sim_config.agents[0].action_space.keys()
-        )
+        action_names = list(config.habitat_sim_config.agents[0].action_space.keys())
         print("Available actions", action_names)
-        print(config.habitat_sim_config.agents[0].action_space, type(config.habitat_sim_config.agents[0].action_space))
+        print(
+            config.habitat_sim_config.agents[0].action_space,
+            type(config.habitat_sim_config.agents[0].action_space),
+        )
         print("Current scene:", env.scene_manager._current_scene)
+        end = False
         for _ in range(n_episodes):
-            end = False
             obs = env.reset()
-            print("Initial position", env.agent_position)                
+            print("Initial position", env.agent_position)
 
             visualize(args.interactive, obs)
             # assert env._curr_task_idx == task_idx, "Task should change at each new episode"
             task_idx = (task_idx + 1) % 2
             step = 0
             while not env.done:
-            # for i in range(3):
+                # for i in range(3):
                 if args.interactive:
                     keystroke = cv2.waitKey(0)
                     # ord gets unicode from one-char string
@@ -72,7 +86,7 @@ if __name__ == "__main__":
                     elif keystroke == ord(RIGHT_KEY):
                         action = "turn_right"
                     elif keystroke == ord(FINISH):
-                        action = "stop"
+                        break
                     elif keystroke == ord("q") or keystroke == 127:
                         print("Closing..")
                         end = True

@@ -6,7 +6,7 @@ from habitat_sim import Simulator
 from typing import List, Union
 from avalanche_lab.tasks.tasks import Task
 from avalanche_lab.task_collection.task_iterator import TaskIterator
-import time
+import time, logging
 import numpy as np
 
 
@@ -24,6 +24,7 @@ class AvalancheEnv(gym.Env):
     def __init__(self, config: AvalancheConfig) -> None:
         self.scene_manager = SceneManager(config)
         scene = self.scene_manager.current_scene
+        # config.refresh_config()
         self.sim = Simulator(config.make_habitat_sim_config(scene))
         # init agent(s)
         for i in range(len(config.habitat_sim_config.agents)):
@@ -43,13 +44,16 @@ class AvalancheEnv(gym.Env):
 
         # scene may also change on new episode
         scene, scene_changed = self.scene_manager.get_scene(self._episode_counter)
-
+        print(scene, scene_changed)
         # TODO: suppress output to console from sim if possible
         # reconfigure only on scene change
         if scene_changed:
+            logging.info("Changing scene..")
             self.sim.reconfigure(
-                AvalancheConfig.habitat_sim_config(self._config, scene)
+                self._config.make_habitat_sim_config(scene)
             )
+            # reset position
+            # self.sim.initialize_agent(0)
             self.current_task.on_scene_change()
 
         task.on_new_episode()

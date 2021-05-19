@@ -5,7 +5,7 @@ from pathlib import Path, PosixPath
 import random
 from collections import OrderedDict
 from itertools import cycle
-import logging
+import logging, os
 
 
 class SceneManager:
@@ -21,10 +21,20 @@ class SceneManager:
 
     def __init__(self, config: AvalancheConfig) -> None:
         self._config = config
-        self._cycle_datasets = self._config.scene.cycle_datasets
-        self._sample_random_scene = self._config.scene.sample_random_scene
+        if config.scene.scene_path is not None:
+            logging.warning(f"Loading Scene manager with a single scene: {config.scene.scene_path}")
+            self._single_scene_setup()
+        else:
+            self._cycle_datasets = self._config.scene.cycle_datasets
+            self._sample_random_scene = self._config.scene.sample_random_scene
 
-        self._init_scene_manager()
+            self._init_scene_manager()
+
+    def _single_scene_setup(self):
+        if not os.path.exists(self._config.scene.scene_path):
+            raise Exception(f'Specified scene path {self._config.scene.scene_path} does not exist! Aborting..')
+        self._current_scene = self._config.scene.scene_path
+        self._config.scene.max_scene_repeat_episodes = -1
 
     def _init_scene_manager(self):
         if not self._config.scene.dataset_paths or not len(
@@ -33,6 +43,9 @@ class SceneManager:
             raise Exception(
                 "No scene directory specified in configuration. Make sure to select a scene before starting the environment!"
             )
+        for dirpath in self._config.scene.dataset_paths:
+            if not os.path.exists(dirpath):
+                raise Exception(f'Specified dataset path {dirpath} does not exist! Aborting..')
         self._scenes_by_dataset = OrderedDict()
         # check that every (super) directory contains at least one valid mesh
         for dirpath in self._config.scene.dataset_paths:

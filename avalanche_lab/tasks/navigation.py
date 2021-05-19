@@ -59,7 +59,7 @@ def get_shortest_path_actions(
         state.sensor_states = {}
         agent.set_state(state, reset_sensors=True)
         sim.reset()
-
+    # FIXME: this doesn't seem to work
     follower = GreedyGeodesicFollower(
         sim.pathfinder,
         sim.get_agent(0),  # single agent setting
@@ -72,7 +72,7 @@ def get_shortest_path_actions(
         shortest_path = follower.find_path(goal_position)
     except GreedyFollowerError as e:
         logging.error(
-            f"Unable to find shortest path to target position {goal_position}"
+            f"Unable to find shortest path to target position {goal_position} from {source_position}"
         )
 
     return shortest_path
