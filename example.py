@@ -17,6 +17,7 @@ FORWARD_KEY = "w"
 LEFT_KEY = "a"
 RIGHT_KEY = "d"
 FINISH = "f"
+RANDOM_TP = "t"
 
 
 # def rgb2bgr(image):
@@ -87,6 +88,18 @@ if __name__ == "__main__":
                         action = "turn_right"
                     elif keystroke == ord(FINISH):
                         break
+                    elif keystroke == ord(RANDOM_TP):
+                        agent = env.sim.get_agent(0)
+                        agent_state = habitat_sim.AgentState()
+                        # state = agent.get_state()
+                        pos = env.sim.pathfinder.get_random_navigable_point()
+                        agent_state.position = pos
+                        # agent_state.sensor_states = {}
+                        # env.sim.get_agent(0).set_state(state, reset_sensors=True)
+                        agent.set_state(agent_state)#, reset_sensors=True)
+                        # env.sim.reset()
+                        # to get new obs
+                        action = 'no_op'
                     elif keystroke == ord("q") or keystroke == 127:
                         print("Closing..")
                         end = True

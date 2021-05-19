@@ -80,7 +80,7 @@ class VoidTask(Task):
 
     def on_new_episode(self):
         self.steps = 0
-        
+
     def goal_test(self, obs: gym.spaces.dict.Dict) -> bool:
         self.steps += 1
         return False if self.steps < self.max_steps else True
@@ -151,13 +151,20 @@ class ObjectNav(Task):
         if not len(self.goals):
             agent = self.sim.get_agent(0)
             # TODO: generate from current position?
-            agent_state = agent.get_state()
+            agent_state_pos = agent.get_state().position
+            agent_state_rot = agent.get_state().rotation 
             self.goals = generate_pointnav_episode(
                 self.sim,
-                agent_state.position,
+                agent_state_pos,
                 number_of_episodes=self.n_episodes,
                 geodesic_to_euclid_starting_ratio=self.difficulty.value,
             )
+            # TODO: test re-positionate agent to original pose
+            agent_state = habitat_sim.AgentState()
+            agent_state.position = agent_state_pos
+            agent_state.rotation = agent_state_rot
+            agent.set_state(agent_state)
+
             if self.goals is None:
                 # TODO: Fallback to random point?
                 raise Exception("Can't generate new goal")

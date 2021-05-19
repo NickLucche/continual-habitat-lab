@@ -21,26 +21,34 @@ def make_simple_cfg(settings):
     rgb_sensor_spec.position = [0.0, settings["sensor_height"], 0.0]
 
     semantic_sensor_spec = habitat_sim.CameraSensorSpec()
-    semantic_sensor_spec.uuid = "semantic_sensor" # used for getting obs key 
+    semantic_sensor_spec.uuid = "semantic" # used for getting obs key 
     semantic_sensor_spec.sensor_type = habitat_sim.SensorType.SEMANTIC
     semantic_sensor_spec.resolution = [settings["height"], settings["width"]]
     semantic_sensor_spec.position = [0.0, settings["sensor_height"], 0.0]
 
-    agent_cfg.sensor_specifications = [rgb_sensor_spec, semantic_sensor_spec]
+    depth_sensor_spec = habitat_sim.CameraSensorSpec()
+    depth_sensor_spec.uuid = "depth_sensor" # used for getting obs key 
+    depth_sensor_spec.sensor_type = habitat_sim.SensorType.DEPTH
+    depth_sensor_spec.resolution = [settings["height"], settings["width"]]
+    depth_sensor_spec.position = [0.0, settings["sensor_height"], 0.0]
+
+    agent_cfg.sensor_specifications = [rgb_sensor_spec, semantic_sensor_spec, depth_sensor_spec]
 
     return habitat_sim.Configuration(sim_cfg, [agent_cfg])
 
 
 # This is the scene we are going to load.
 # we support a variety of mesh formats, such as .glb, .gltf, .obj, .ply
-test_scene = "/home/nick/datasets/habitat/gibson/gibson/Cokeville.glb"
+# test_scene = "/home/nick/datasets/habitat/gibson/gibson/Cokeville.glb"
+# test_scene = "data/scene_datasets/habitat-test-scenes/skokloster-castle.glb"
+test_scene = "/home/nick/datasets/habitat/scene_dataset/mp3d/v1/tasks/mp3d/ZMojNkEp431/ZMojNkEp431.glb"
 
 sim_settings = {
     "scene": test_scene,  # Scene path
     "default_agent": 0,  # Index of the default agent
     "sensor_height": 1.5,  # Height of sensors in meters, relative to the agent
-    "width": 256,  # Spatial resolution of the observations
-    "height": 256,
+    "width": 512,  # Spatial resolution of the observations
+    "height": 512,
 }
 cfg = make_simple_cfg(sim_settings)
 # create simulator
@@ -67,10 +75,10 @@ with habitat_sim.Simulator(cfg) as sim:
         action = random.choice(action_names)
         print("action", action)
         observations = sim.step(action)
-        obs = observations["color_sensor"]
-        # obs = observations["semantic_sensor"]
-        # depth = observations["depth_sensor"]
-        print(obs.shape)
+        # obs = observations["color_sensor"]
+        obs = observations["semantic"]
+        # obs = observations["depth_sensor"]
+        print(obs.shape, obs.max(), obs.min(), obs.dtype)
         plt.imshow(obs)
         plt.show()
         total_frames += 1

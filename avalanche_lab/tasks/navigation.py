@@ -48,18 +48,21 @@ def get_shortest_path_actions(
 
     if reset_agent:
         agent = sim.get_agent(0)
-        state = agent.get_state()
-        state.position = source_position
-        state.rotation = source_rotation
+        # state = agent.get_state()
+        # TODO: reassignment doesnt work must re-create agent state
+        agent_state = habitat_sim.AgentState()
+        agent_state.position = source_position
+        agent_state.rotation = source_rotation
         # NB: The agent state also contains the sensor states in _absolute_
         # coordinates. In order to set the agent's body to a specific
         # location and have the sensors follow, we must not provide any
         # state for the sensors. This will cause them to follow the agent's
         # body
-        state.sensor_states = {}
-        agent.set_state(state, reset_sensors=True)
-        sim.reset()
-    # FIXME: this doesn't seem to work
+        # state.sensor_states = {}
+        # agent.set_state(state, reset_sensors=True)
+        agent.set_state(agent_state)
+        # sim.reset()
+        
     follower = GreedyGeodesicFollower(
         sim.pathfinder,
         sim.get_agent(0),  # single agent setting

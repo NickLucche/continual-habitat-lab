@@ -34,6 +34,7 @@ class SceneExplorer(ObjectNav):
         goals = []
         # generate random path from sensible starting points
         for i in range(n):
+            # if not sim.pathfinder.is_loaded:
             pathf = self.sim.pathfinder
             source = pathf.get_random_navigable_point()
             angle = np.random.uniform(0, 2 * np.pi)
@@ -95,6 +96,7 @@ explorer_config = {
     "scene": {
         # 'scene_path': '/home/nick/datasets/habitat/gibson/gibson/Cokeville.glb'
         "dataset_paths": ["/home/nick/datasets/habitat/gibson/gibson/"]
+        # "dataset_paths": ["/home/nick/datasets/habitat/scene_dataset/mp3d/v1/tasks/mp3d/"]
     },
 }
 
@@ -166,13 +168,16 @@ class VisualExplorationDataset(IterableDataset):
 
 if __name__ == "__main__":
     import cv2
+    # needs to have this file to load semantic annotations
+    # Loading Semantic Stage mesh : ../mp3d/v1/tasks/mp3d/ZMojNkEp431/ZMojNkEp431_semantic.ply
 
     dataset = VisualExplorationDataset(paths_per_scene=1, img_resolution=(512, 512))
 
     for i, obs in enumerate(dataset):
         print("current scene", dataset.env.current_scene)
         print("num obs", i)
-        rgb = obs["rgb"]
+        rgb = obs["rgb"].astype(np.uint8)
+        print(rgb.shape, rgb.max(), rgb.min(), rgb.dtype)
         print(rgb.shape)
         cv2.imshow("rgb", rgb)
         key = cv2.waitKey(0)
