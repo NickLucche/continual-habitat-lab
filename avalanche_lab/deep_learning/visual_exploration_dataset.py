@@ -148,7 +148,7 @@ class VisualExplorationDataset(IterableDataset):
 
     def __next__(self):
         action = self.env.current_task.goal.shortest_path[self.step]
-        print('len of path', len(self.env.current_task.goal.shortest_path))
+        # print('len of path', len(self.env.current_task.goal.shortest_path))
         self.step += 1
         obs, _, _, _ = self.env.step(action)
         # this is the last step, reset env/get new path
@@ -164,19 +164,18 @@ class VisualExplorationDataset(IterableDataset):
         self.env.close()
 
 
-# TODO: sequential sample correlation might hurt learning?
 
 if __name__ == "__main__":
     import cv2
     # needs to have this file to load semantic annotations
     # Loading Semantic Stage mesh : ../mp3d/v1/tasks/mp3d/ZMojNkEp431/ZMojNkEp431_semantic.ply
 
-    dataset = VisualExplorationDataset(paths_per_scene=1, img_resolution=(512, 512))
+    dataset = VisualExplorationDataset(paths_per_scene=1, semantic=False, depth=True, img_resolution=(512, 512))
 
     for i, obs in enumerate(dataset):
         print("current scene", dataset.env.current_scene)
         print("num obs", i)
-        rgb = obs["rgb"].astype(np.uint8)
+        rgb = obs["depth"]#.astype(np.uint8)
         print(rgb.shape, rgb.max(), rgb.min(), rgb.dtype)
         print(rgb.shape)
         cv2.imshow("rgb", rgb)

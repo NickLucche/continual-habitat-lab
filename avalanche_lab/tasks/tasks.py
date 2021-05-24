@@ -124,7 +124,8 @@ class ObjectNav(Task):
         difficulty: Difficulty = Difficulty.NORMAL,
         pre_compute_episodes: int = 1,
         keep_goal_fixed: bool = False,
-        goal_tollerance: float = .5,
+        goal_tolerance: float = 1.,
+        ignore_y_axis: bool=True,
         *args, **kwargs
     ) -> None:
         super().__init__(sim, *args, **kwargs)
@@ -133,7 +134,18 @@ class ObjectNav(Task):
         self.keep_goal_fixed = keep_goal_fixed
         self.n_episodes = pre_compute_episodes
         self.goals = []
-        self.tollerance = goal_tollerance
+        self.tolerance = goal_tolerance
+        self.object_asset = object_asset
+        self.ignore_y = ignore_y_axis
+        self.obj_id = -1
+        if object_asset.strip() != '':
+            obj_templates_mgr = sim.get_object_template_manager()
+            # load object config file (render asset, default mass..)
+            loaded = obj_templates_mgr.load_configs("data/objects/sphere")
+            print("Loaded configs", loaded)
+            # search for an object template by key sub-string
+            self.obj_template_handle = obj_templates_mgr.get_template_handles(object_asset)
+            print("Template handle", self.obj_template_handle)
 
     def on_new_episode(self):
         if not self.keep_goal_fixed:
@@ -146,6 +158,10 @@ class ObjectNav(Task):
     def on_scene_change(self):
         # new scene, invalidate generated goals
         self.goals = []
+        # (re)add object to scene 
+        if self.obj_template_handle and self.obj_id not in self.sim.get_existing_object_ids():
+            self.obj_id = self.sim.add_object_by_handle(self.obj_template_handle[0])
+
 
     def _generate_goal(self):
         if not len(self.goals):
@@ -170,12 +186,23 @@ class ObjectNav(Task):
                 raise Exception("Can't generate new goal")
             
         self.goal = self.goals.pop()
+        print('obj ids',self.sim.get_existing_object_ids())
+        # assert self.obj_id in self.sim.get_existing_object_ids()
+
+        # move object to goal position 
+        if self.obj_template_handle:
+            self.sim.set_translation(self.goal.goal_position, self.obj_id)
+            # self.sim.set_rotation(self.goal.goal_position, self.obj_id)
+
 
     def goal_test(self, obs: gym.spaces.dict.Dict) -> bool:
         # TODO: check if observation space contains agent's position
         # otherwise simply get it from simulator (abs position is unknown to agent)
         agent_pos = self.sim.get_agent(0).get_state().position
-        return np.linalg.norm(self.goal.goal_position - agent_pos) < self.tollerance
+        # don't consider height
+        if self.ignore_y:
+            agent_pos[1] = self.goal.goal_position[1]
+        return np.linalg.norm(self.goal.goal_position - agent_pos) < self.tolerance
 
     def reward_function(self, prev_obs: gym.spaces.dict.Dict, curr_obs: gym.spaces.dict.Dict, action):
         # TODO: not efficient

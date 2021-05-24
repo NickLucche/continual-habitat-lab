@@ -4,16 +4,20 @@ agent:
   height: 1.4
   sensor_specifications:
     - type: RGB
-      resolution: [512, 512]
+      resolution: [1024, 1024]
     # - type: SEMANTIC
   # action_space:
     # move_forward:
       # name: 'some_name'
 tasks:
   - name: "MyTask"
-    type: "VoidTask"
-    max_steps: 10
+    # type: "VoidTask"
+    type: "ObjectNav"
+    object_asset: 'sphere'
+    max_steps: 1000
+    difficulty: 'TRIVIAL'
 
 scene:
-  # dataset_paths: ['data/scene_datasets/habitat-test-scenes/']
-  dataset_paths: ['/home/nick/datasets/habitat/gibson/gibson/']
+  dataset_paths: ['data/scene_datasets/habitat-test-scenes/']
+  # dataset_paths: ['/home/nick/datasets/habitat/gibson/gibson/']
+  # scene_path: '/home/nick/datasets/habitat/replicav1/room_2/habitat/mesh_semantic.ply'

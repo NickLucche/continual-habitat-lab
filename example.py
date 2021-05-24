@@ -70,12 +70,15 @@ if __name__ == "__main__":
         for _ in range(n_episodes):
             obs = env.reset()
             print("Initial position", env.agent_position)
-
+            
             visualize(args.interactive, obs)
             # assert env._curr_task_idx == task_idx, "Task should change at each new episode"
             task_idx = (task_idx + 1) % 2
             step = 0
             while not env.done:
+                if isinstance(env.current_task, ObjectNav):
+                    print("Goal position", env.current_task.goal.goal_position)
+
                 # for i in range(3):
                 if args.interactive:
                     keystroke = cv2.waitKey(0)
