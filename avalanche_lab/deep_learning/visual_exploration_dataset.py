@@ -5,7 +5,8 @@ import os
 # remove info logging
 os.environ["GLOG_minloglevel"] = "3"
 import numpy as np
-from torch.utils.data import Dataset, IterableDataset
+from torch.utils.data.dataset import Dataset, IterableDataset
+from torch.utils.data.dataloader import DataLoader
 import habitat_sim
 from typing import Tuple
 from dataclasses import dataclass
@@ -15,6 +16,10 @@ from avalanche_lab.config import AvalancheConfig
 from avalanche_lab.env import AvalancheEnv
 from avalanche_lab.tasks.navigation import generate_pointnav_episode
 import random
+from avalanche_lab.logger import avl_logger
+from typing import List
+import cv2
+from torchvision.utils import save_image
 
 MAX_RETRIES = 30
 
@@ -94,8 +99,8 @@ explorer_config = {
         ],
     },
     "scene": {
-        # 'scene_path': '/home/nick/datasets/habitat/gibson/gibson/Cokeville.glb'
-        "dataset_paths": ["/home/nick/datasets/habitat/gibson/gibson/"]
+        "scene_path": "/home/nick/datasets/habitat/replicav1/room_2/habitat/mesh_semantic.ply"
+        # "dataset_paths": ["/home/nick/datasets/habitat/gibson/gibson/"]
         # "dataset_paths": ["/home/nick/datasets/habitat/scene_dataset/mp3d/v1/tasks/mp3d/"]
     },
 }
@@ -112,11 +117,15 @@ class VisualExplorationDataset(IterableDataset):
     agent traverse the scene gathering observations as it goes.
     """
     config: AvalancheConfig = AvalancheConfig(OmegaConf.create(explorer_config))
-    dataset_size: int = int(1e5)
     img_resolution: Tuple[int, int] = (128, 128)
+    # instance segmentation flag
     semantic: bool = True
     depth: bool = False
     paths_per_scene: int = 10
+    to_tensor: bool = True
+    instance_segmentation: bool = False
+    # manual batching to have better segmentation mapping performance
+    batch_size: int = 1
 
     def __post_init__(self):
         # instatiate an env using ObjectNav task to explore scenes and 'modded' configs
@@ -138,24 +147,74 @@ class VisualExplorationDataset(IterableDataset):
         print(OmegaConf.to_yaml(self.config._config))
         self.env = AvalancheEnv(self.config)
         self.env.reset()
+        # get semantic scene mapping
+        scene = self.env.sim.semantic_scene
+        # categories list scene.categories[1].index()/name()
+        self.category_id_to_name = {
+            cat.index(): cat.name() for cat in scene.categories if cat is not None
+        }
+        self.category_id_to_name[0] = 'unknown'
+        print(self.category_id_to_name)
+        self.object_id_to_category_id = {
+            int(obj.id.split("_")[-1]): obj.category.index()
+            for obj in scene.objects
+            if obj and obj.category is not None
+        }
+        self.object_id_to_category_id[0] = 0
+        # object_id_to_category_name = {int(obj.id.split("_")[-1]): obj.category.name() for obj in scene.objects if obj is not None}
+        print(self.object_id_to_category_id)
         # to explore scenes
         # self._pathfinder = self.env.sim.pathfinder
 
+    def _instance_seg_to_category(self, x:np.ndarray):
+        for objid in np.unique(x):
+            # TODO: investigate
+            x[x==objid] = self.object_id_to_category_id[objid] if objid in self.object_id_to_category_id else 0
+        return x
+
     def __iter__(self):
+        # TODO: should implement to work with dataloader
         # worker_info = torch.utils.data.get_worker_info()
 
         return self
 
     def __next__(self):
-        action = self.env.current_task.goal.shortest_path[self.step]
-        # print('len of path', len(self.env.current_task.goal.shortest_path))
-        self.step += 1
-        obs, _, _, _ = self.env.step(action)
-        # this is the last step, reset env/get new path
-        if self.env.current_task.goal.shortest_path[self.step] is None:
-            self.step = 0
-            self.env.reset()
-        return obs
+        batched_obs = {'rgb': []}
+        if self.semantic:
+            batched_obs['semantic'] = []
+        if self.depth:
+            batched_obs['depth'] = []
+
+        for _ in range(self.batch_size):
+            action = self.env.current_task.goal.shortest_path[self.step]
+            # print('len of path', len(self.env.current_task.goal.shortest_path))
+            self.step += 1
+            obs, _, _, _ = self.env.step(action)
+            # this is the last step, reset env/get new path
+            if self.env.current_task.goal.shortest_path[self.step] is None:
+                self.step = 0
+                self.env.reset()
+            # collision key ignored here
+            for k in batched_obs:
+                batched_obs[k].append(obs[k])
+        # stack obs
+        batched_obs = {k:np.stack(v, axis=0) for k,v in batched_obs.items()}
+        print('shapes', [b.shape for b in batched_obs.values()])
+        # ignore alpha channel
+        batched_obs["rgb"] = batched_obs["rgb"][..., :3]
+        if self.semantic:
+            if not self.instance_segmentation:
+                batched_obs['semantic'] = self._instance_seg_to_category(batched_obs['semantic']) 
+            # pytorch does not support uint32
+            batched_obs["semantic"] = batched_obs["semantic"].astype(np.int32)
+
+        if self.to_tensor:
+            batched_obs["rgb"] = torch.from_numpy(batched_obs["rgb"]).permute(0, 3, 1, 2)
+            if self.semantic:
+                batched_obs["semantic"] = torch.from_numpy(batched_obs["semantic"])
+            if self.depth:
+                batched_obs["depth"] = torch.from_numpy(batched_obs["depth"])
+        return batched_obs
 
     def __exit__(self):
         self.close()
@@ -164,24 +223,110 @@ class VisualExplorationDataset(IterableDataset):
         self.env.close()
 
 
+class AsyncVisualExplorationDataset(Dataset):
+    """
+    Dataset which which first gathers observations from the environment
+    and then stores those observations on disk in order to have a classical
+    image dataset.
+    Train-test split with data from different scenes is supported.
+    """
 
-if __name__ == "__main__":
-    import cv2
-    # needs to have this file to load semantic annotations
-    # Loading Semantic Stage mesh : ../mp3d/v1/tasks/mp3d/ZMojNkEp431/ZMojNkEp431_semantic.ply
+    def __init__(
+        self,
+        root: str,
+        size: int = 10000,
+        recompute: bool = False,
+        subdir_suffix: str = "_train",
+        *explorer_args,
+        **explorer_kwargs,
+    ) -> None:
+        self.dataset_size = size
+        self.root = root
+        self.dataset_loaded = False
+        self.expl_args = explorer_args
+        self.expl_kwargs = explorer_kwargs
+        if not recompute and os.path.exists(
+            os.path.join(root, f"avalanche_habitat_dataset{subdir_suffix}")
+        ):
+            avl_logger.info("Found exisiting dataset folder.")
+            self.dataset_loaded = True
+        else:
+            try:
+                os.mkdir(
+                    os.path.join(root, f"avalanche_habitat_dataset{subdir_suffix}")
+                )
+                avl_logger.info(
+                    "Pre-exisiting dataset folder not found, creating dataset by exploring environment..."
+                )
+            except:
+                avl_logger.info("Recomputing dataset..")
+            self.create_dataset(subdir_suffix=subdir_suffix)
+            self.dataset_loaded = True
 
-    dataset = VisualExplorationDataset(paths_per_scene=1, semantic=False, depth=True, img_resolution=(512, 512))
-
-    for i, obs in enumerate(dataset):
-        print("current scene", dataset.env.current_scene)
-        print("num obs", i)
-        rgb = obs["depth"]#.astype(np.uint8)
-        print(rgb.shape, rgb.max(), rgb.min(), rgb.dtype)
-        print(rgb.shape)
-        cv2.imshow("rgb", rgb)
-        key = cv2.waitKey(0)
-        if key == ord("q"):
+    def create_dataset(
+        self, batch_size: int = 10, num_workers=1, subdir_suffix: str = "_train"
+    ):
+        # tensor transform is done by dataloader
+        self.expl_kwargs.update({"to_tensor": False, 'batch_size': batch_size})
+        # create dataloader to explore env
+        dataset = VisualExplorationDataset(*self.expl_args, **self.expl_kwargs)
+        # this will result in multiple AvalancheEnv being created
+        # enable manual batching
+        dl = DataLoader(dataset, batch_size=None, num_workers=num_workers)
+        for bidx, obs in enumerate(dataset):
+            print(len(obs), [v.shape for v in obs.values()])
+            self._save_tensors_to_images(obs, bidx, subdir_suffix)
             break
 
-    cv2.destroyAllWindows()
+    def _save_tensors_to_images(
+        self, obs: List[torch.Tensor], batch_idx: int, subdir_suff: str = "_train"
+    ):
+        # save images resulting from batched tensors
+        for type_, batched in obs.items():
+            for i, img in enumerate(batched):
+                print("image", img.shape, img.dtype)
+                cv2.imwrite(
+                    os.path.join(
+                        self.root,
+                        f"avalanche_habitat_dataset{subdir_suff}/{batch_idx}_{type_}_{i}.png",
+                    ),
+                    img,
+                )
+
+
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+
+    # needs to have this file to load semantic annotations
+    # Loading Semantic Stage mesh : ../mp3d/v1/tasks/mp3d/ZMojNkEp431/ZMojNkEp431_semantic.ply
+    ds = AsyncVisualExplorationDataset("/home/nick/datasets/", recompute=True, img_resolution=(512, 512))
+
+    # dataset = VisualExplorationDataset(
+    #     paths_per_scene=1, semantic=True, depth=True, img_resolution=(512, 512), batch_size=1
+    # )
+    # id = iter(dataset)
+    # for i in range(3):
+    #     obs = next(id)
+    #     print("current scene", dataset.env.current_scene)
+    #     print("num obs", i)
+    #     rgb = obs["rgb"]  # .astype(np.uint8)
+    #     depth = obs["depth"]  # .astype(np.uint8)
+    #     semantic = obs["semantic"]  # .astype(np.uint8)
+    #     print("Categories in semantic:", [dataset.category_id_to_name[x] for x in np.unique(semantic)])
+    #     print(rgb.shape, rgb.max(), rgb.min(), rgb.dtype)
+    #     # dist in meters
+    #     print(depth.shape, depth.max(), depth.min(), depth.dtype)
+    #     print(semantic.shape, semantic.max(), semantic.min(), semantic.dtype)
+    #     # cv2.imshow("rgb", rgb)
+    #     plt.imshow(rgb.squeeze().permute(1, 2, 0).numpy())
+    #     plt.show()
+    #     plt.imshow(depth.squeeze().numpy())
+    #     plt.show()
+    #     plt.imshow(semantic.squeeze().numpy(), cmap='tab20')
+    #     plt.show()
+    # key = cv2.waitKey(0)
+    # if key == ord("q"):
+    # break
+
+    # cv2.destroyAllWindows()
 

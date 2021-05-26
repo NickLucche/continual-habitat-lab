@@ -1,11 +1,13 @@
 simulator:
-  random_seed: 7
+  random_seed: 17
 agent:
   height: 1.4
   sensor_specifications:
     - type: RGB
       resolution: [1024, 1024]
-    # - type: SEMANTIC
+    - type: SEMANTIC
+      resolution: [1024, 1024]
+
   # action_space:
     # move_forward:
       # name: 'some_name'
@@ -18,6 +20,6 @@ tasks:
     difficulty: 'TRIVIAL'
 
 scene:
-  dataset_paths: ['data/scene_datasets/habitat-test-scenes/']
+  # dataset_paths: ['data/scene_datasets/habitat-test-scenes/']
   # dataset_paths: ['/home/nick/datasets/habitat/gibson/gibson/']
-  # scene_path: '/home/nick/datasets/habitat/replicav1/room_2/habitat/mesh_semantic.ply'
+  scene_path: '/home/nick/datasets/habitat/replicav1/room_2/habitat/mesh_semantic.ply'

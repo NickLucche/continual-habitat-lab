@@ -126,6 +126,7 @@ class ObjectNav(Task):
         keep_goal_fixed: bool = False,
         goal_tolerance: float = 1.,
         ignore_y_axis: bool=True,
+        maintain_start_position: bool = False,
         *args, **kwargs
     ) -> None:
         super().__init__(sim, *args, **kwargs)
@@ -137,6 +138,7 @@ class ObjectNav(Task):
         self.tolerance = goal_tolerance
         self.object_asset = object_asset
         self.ignore_y = ignore_y_axis
+        self.maint_start_position = maintain_start_position
         self.obj_id = -1
         if object_asset.strip() != '':
             obj_templates_mgr = sim.get_object_template_manager()
@@ -146,6 +148,7 @@ class ObjectNav(Task):
             # search for an object template by key sub-string
             self.obj_template_handle = obj_templates_mgr.get_template_handles(object_asset)
             print("Template handle", self.obj_template_handle)
+            self.obj_id = self.sim.add_object_by_handle(self.obj_template_handle[0])
 
     def on_new_episode(self):
         if not self.keep_goal_fixed:
@@ -166,20 +169,24 @@ class ObjectNav(Task):
     def _generate_goal(self):
         if not len(self.goals):
             agent = self.sim.get_agent(0)
-            # TODO: generate from current position?
-            agent_state_pos = agent.get_state().position
-            agent_state_rot = agent.get_state().rotation 
+            # TODO: generate from current position? always start from same pos..?
+            agent_state_pos = None
+
+            if self.maint_start_position:
+                agent_state_pos = agent.get_state().position
+                agent_state_rot = agent.get_state().rotation 
             self.goals = generate_pointnav_episode(
                 self.sim,
-                agent_state_pos,
+                agent_position=agent_state_pos,
                 number_of_episodes=self.n_episodes,
                 geodesic_to_euclid_starting_ratio=self.difficulty.value,
             )
             # TODO: test re-positionate agent to original pose
-            agent_state = habitat_sim.AgentState()
-            agent_state.position = agent_state_pos
-            agent_state.rotation = agent_state_rot
-            agent.set_state(agent_state)
+            if self.maint_start_position:
+                agent_state = habitat_sim.AgentState()
+                agent_state.position = agent_state_pos
+                agent_state.rotation = agent_state_rot
+                agent.set_state(agent_state)
 
             if self.goals is None:
                 # TODO: Fallback to random point?

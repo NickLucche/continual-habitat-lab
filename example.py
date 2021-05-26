@@ -26,21 +26,21 @@ RANDOM_TP = "t"
 
 def visualize(flag: bool, obs):
     if flag:
-        img = obs["rgb"]
-        if "semantic" in obs and obs["semantic"].shape[0] == img.shape[0]:
-            # this may merge some classes
-            sem = (obs['semantic']/obs['semantic'].max()).astype(np.uint8)
-            print(sem.max(), sem.min(), sem.dtype)
-            print(img.max(), img.min(), img.dtype)
-            # rgb sensor returns 4 channels by default (rgba)
-            img = np.hstack(
-                [
-                    img,
-                    np.zeros((img.shape[0], 2, 4)),
-                    obs["semantic"][:, :, np.newaxis].repeat(4, axis=2),
-                ]
-            )
-            print('img shape', img.shape)
+        img = obs["semantic"].astype(np.uint8)
+        # if "semantic" in obs:
+        #     # this may merge some classes
+        #     sem = (obs['semantic']/obs['semantic'].max()).astype(np.uint8)
+        #     print(sem.max(), sem.min(), sem.dtype)
+        #     print(img.max(), img.min(), img.dtype)
+        #     # rgb sensor returns 4 channels by default (rgba)
+        #     img = np.hstack(
+        #         [
+        #             img,
+        #             np.zeros((img.shape[0], 2, 4)),
+        #             obs["semantic"][:, :, np.newaxis].repeat(4, axis=2),
+        #         ]
+        #     )
+        #     print('img shape', img.shape)
         cv2.imshow("RGB", img)
 
 
