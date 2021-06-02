@@ -44,7 +44,6 @@ class AvalancheEnv(gym.Env):
 
         # scene may also change on new episode
         scene, scene_changed = self.scene_manager.get_scene(self._episode_counter)
-        print(scene, scene_changed)
         # TODO: suppress output to console from sim if possible
         # reconfigure only on scene change
         if scene_changed:

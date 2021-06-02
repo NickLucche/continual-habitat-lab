@@ -19,6 +19,7 @@ import random
 from avalanche_lab.logger import avl_logger
 from typing import List
 import cv2
+from glob import glob
 from torchvision.utils import save_image
 
 MAX_RETRIES = 30
@@ -126,11 +127,17 @@ class VisualExplorationDataset(IterableDataset):
     instance_segmentation: bool = False
     # manual batching to have better segmentation mapping performance
     batch_size: int = 1
+    dataset_path: str = None
+    max_batches: int = None
 
     def __post_init__(self):
         # instatiate an env using ObjectNav task to explore scenes and 'modded' configs
         # iterable dataset workers are replicated on each worker therefore we'll handle multiple envs
         # self.config = OmegaConf.merge(self.config, )
+        if self.dataset_path is not None:
+            self.config.scene.dataset_paths = [self.dataset_path]
+            self.config.scene.scene_path = None
+
         self.config.scene.max_scene_repeat_episodes = self.paths_per_scene
         self.config.tasks[0].pre_compute_episodes = self.paths_per_scene
         if not self.semantic:
@@ -144,6 +151,7 @@ class VisualExplorationDataset(IterableDataset):
             spec.resolution = self.img_resolution
 
         self.step = 0
+        self.batches = 0
         print(OmegaConf.to_yaml(self.config._config))
         self.env = AvalancheEnv(self.config)
         self.env.reset()
@@ -153,7 +161,7 @@ class VisualExplorationDataset(IterableDataset):
         self.category_id_to_name = {
             cat.index(): cat.name() for cat in scene.categories if cat is not None
         }
-        self.category_id_to_name[0] = 'unknown'
+        self.category_id_to_name[0] = "unknown"
         print(self.category_id_to_name)
         self.object_id_to_category_id = {
             int(obj.id.split("_")[-1]): obj.category.index()
@@ -161,15 +169,20 @@ class VisualExplorationDataset(IterableDataset):
             if obj and obj.category is not None
         }
         self.object_id_to_category_id[0] = 0
+        self.n_categories = len(self.category_id_to_name)
         # object_id_to_category_name = {int(obj.id.split("_")[-1]): obj.category.name() for obj in scene.objects if obj is not None}
         print(self.object_id_to_category_id)
         # to explore scenes
         # self._pathfinder = self.env.sim.pathfinder
 
-    def _instance_seg_to_category(self, x:np.ndarray):
+    def _instance_seg_to_category(self, x: np.ndarray):
         for objid in np.unique(x):
             # TODO: investigate
-            x[x==objid] = self.object_id_to_category_id[objid] if objid in self.object_id_to_category_id else 0
+            x[x == objid] = (
+                self.object_id_to_category_id[objid]
+                if objid in self.object_id_to_category_id
+                else 0
+            )
         return x
 
     def __iter__(self):
@@ -179,11 +192,14 @@ class VisualExplorationDataset(IterableDataset):
         return self
 
     def __next__(self):
-        batched_obs = {'rgb': []}
+        if self.max_batches is not None and self.batches >= self.max_batches:
+            raise StopIteration()
+        self.batches += 1
+        batched_obs = {"rgb": []}
         if self.semantic:
-            batched_obs['semantic'] = []
+            batched_obs["semantic"] = []
         if self.depth:
-            batched_obs['depth'] = []
+            batched_obs["depth"] = []
 
         for _ in range(self.batch_size):
             action = self.env.current_task.goal.shortest_path[self.step]
@@ -198,17 +214,21 @@ class VisualExplorationDataset(IterableDataset):
             for k in batched_obs:
                 batched_obs[k].append(obs[k])
         # stack obs
-        batched_obs = {k:np.stack(v, axis=0) for k,v in batched_obs.items()}
+        batched_obs = {k: np.stack(v, axis=0) for k, v in batched_obs.items()}
         # ignore alpha channel
         batched_obs["rgb"] = batched_obs["rgb"][..., :3]
         if self.semantic:
             if not self.instance_segmentation:
-                batched_obs['semantic'] = self._instance_seg_to_category(batched_obs['semantic']) 
+                batched_obs["semantic"] = self._instance_seg_to_category(
+                    batched_obs["semantic"]
+                )
             # pytorch does not support uint32
             batched_obs["semantic"] = batched_obs["semantic"].astype(np.int32)
 
         if self.to_tensor:
-            batched_obs["rgb"] = torch.from_numpy(batched_obs["rgb"]).permute(0, 3, 1, 2)
+            batched_obs["rgb"] = torch.from_numpy(batched_obs["rgb"]).permute(
+                0, 3, 1, 2
+            )
             if self.semantic:
                 batched_obs["semantic"] = torch.from_numpy(batched_obs["semantic"])
             if self.depth:
@@ -229,6 +249,8 @@ class AsyncVisualExplorationDataset(Dataset):
     image dataset.
     Train-test split with data from different scenes is supported.
     """
+    depth_scaling_factor:int = 50000
+
 
     def __init__(
         self,
@@ -236,8 +258,8 @@ class AsyncVisualExplorationDataset(Dataset):
         size: int = 10000,
         recompute: bool = False,
         subdir_suffix: str = "_train",
-        semantic: bool = True,
-        depth: bool = False,
+        load_semantic: bool = True,
+        load_depth: bool = False,
         **explorer_kwargs,
     ) -> None:
         self.dataset_size = size
@@ -245,13 +267,20 @@ class AsyncVisualExplorationDataset(Dataset):
         self.dataset_loaded = False
         self.expl_kwargs = explorer_kwargs
         self.subdir_suffix = subdir_suffix
-        self.depth = depth
-        self.semantic = semantic
+        self.depth = load_depth
+        self.semantic = load_semantic
         if not recompute and os.path.exists(
             os.path.join(root, f"avalanche_habitat_dataset{subdir_suffix}")
         ):
-            avl_logger.info("Found exisiting dataset folder.")
+            avl_logger.info(f"Found exisiting dataset folder in {self.root}.")
             self.dataset_loaded = True
+            self.dataset_size = len(
+                glob(
+                    os.path.join(
+                        root, f"avalanche_habitat_dataset{subdir_suffix}", "*_rgb.png"
+                    )
+                )
+            )
         else:
             try:
                 os.mkdir(
@@ -270,24 +299,33 @@ class AsyncVisualExplorationDataset(Dataset):
     ):
         subdir_suffix = self.subdir_suffix if subdir_suffix is None else subdir_suffix
         # tensor transform is done by dataloader
-        self.expl_kwargs.update({"to_tensor": False, 'batch_size': batch_size})
+        self.expl_kwargs.update({"to_tensor": False, "batch_size": batch_size})
         # create dataloader to explore env
         dataset = VisualExplorationDataset(**self.expl_kwargs)
         # this will result in multiple AvalancheEnv being created
         # enable manual batching
-        dl = DataLoader(dataset, batch_size=None, num_workers=num_workers)
+        # dl = DataLoader(dataset, batch_size=None, num_workers=num_workers) TODO: avoid collate_fn we dont need tensor
         for bidx, obs in enumerate(dataset):
             # print(len(obs), [v.shape for v in obs.values()])
             self._save_tensors_to_images(obs, bidx, batch_size, subdir_suffix)
-            if (bidx+1) * batch_size * len(obs) >= self.dataset_size:
+            if (bidx + 1) * batch_size * len(obs) >= self.dataset_size:
                 break
-        print("Done generating samples")
+        avl_logger.info("Done generating samples")
 
     def _save_tensors_to_images(
-        self, obs: List[torch.Tensor], batch_idx: int, batch_size: int, subdir_suff: str = "_train"
+        self,
+        obs: List[torch.Tensor],
+        batch_idx: int,
+        batch_size: int,
+        subdir_suff: str = "_train",
     ):
         # save images resulting from batched tensors
         for type_, batched in obs.items():
+            # scale distances before saving to png
+            if type_ == 'depth':
+                batched = (batched * self.depth_scaling_factor).astype(np.uint16) 
+            # elif type_ == 'semantic':
+                # batched = batched.astype(np.uint16)
             for i, img in enumerate(batched):
                 cv2.imwrite(
                     os.path.join(
@@ -303,12 +341,24 @@ class AsyncVisualExplorationDataset(Dataset):
     def __getitem__(self, index):
         self.rgb = True
         x = {}
-        for type_ in ['rgb', 'semantic', 'depth']:
-            if getattr(self, type_):   
-                img_path = os.path.join(self.root, f'avalanche_habitat_dataset{self.subdir_suffix}', f'{index}_{type_}.png')
-                x[type_] = cv2.imread(img_path)
-        return x
+        for type_ in ["rgb", "semantic", "depth"]:
+            if getattr(self, type_):
+                img_path = os.path.join(
+                    self.root,
+                    f"avalanche_habitat_dataset{self.subdir_suffix}",
+                    f"{index}_{type_}.png",
+                )
+                x[type_] = cv2.imread(img_path, cv2.IMREAD_UNCHANGED)
+                if x[type_] is None:
+                    raise Exception(
+                        f"Unable to load {img_path}, make sure this file exists and that you're loading from the right directory!"
+                    )
+                if type_ == "rgb":
+                    x[type_] = x[type_].transpose(2, 1, 0)
+                elif type_ == "depth":
+                    x[type_] = (x[type_] / self.depth_scaling_factor).astype(np.float32)
 
+        return x
 
 
 if __name__ == "__main__":
@@ -316,16 +366,42 @@ if __name__ == "__main__":
 
     # needs to have this file to load semantic annotations
     # Loading Semantic Stage mesh : ../mp3d/v1/tasks/mp3d/ZMojNkEp431/ZMojNkEp431_semantic.ply
-    ds = AsyncVisualExplorationDataset("/home/nick/datasets/", recompute=True, img_resolution=(512, 512), size=100)
-    for i in range(3):
-        x = ds[i]
-        for t in ['rgb', 'semantic', 'depth']:
-            if t in x:
-                plt.imshow(x[t])
-                plt.show()
+    dataset = AsyncVisualExplorationDataset(
+        "/home/nick/datasets/",
+        recompute=True,
+        img_resolution=(512, 512),
+        size=100,
+        load_depth=True,
+        load_semantic=False,
+        semantic=False,
+        depth=True,
+    )
+    # for i in range(3):
+    #     x = ds[i]
+    #     for t in ['rgb', 'semantic', 'depth']:
+    #         if t in x:
+    #             plt.imshow(x[t])
+    #             plt.show()
     # dataset = VisualExplorationDataset(
-    #     paths_per_scene=1, semantic=True, depth=True, img_resolution=(512, 512), batch_size=1
+    #     paths_per_scene=1,
+    #     semantic=True,
+    #     depth=True,
+    #     img_resolution=(512, 512),
+    #     batch_size=1,
     # )
+    # dl = DataLoader(dataset, batch_size=None)
+    dl = DataLoader(dataset, batch_size=5, shuffle=False)
+    for i, obs in enumerate(dl):
+        for t in ["rgb", "semantic", "depth"]:
+            if t in obs:
+                print(t, obs[t].shape)
+                if t == "rgb":
+                    plt.imshow(obs[t][0].squeeze().permute(2, 1, 0).numpy())
+                else:
+                    plt.imshow(obs[t][0].squeeze().numpy())
+                plt.show()
+        if i >= 3:
+            break
     # id = iter(dataset)
     # for i in range(3):
     #     obs = next(id)

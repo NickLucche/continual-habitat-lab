@@ -26,7 +26,7 @@ RANDOM_TP = "t"
 
 def visualize(flag: bool, obs):
     if flag:
-        img = obs["semantic"].astype(np.uint8)
+        img = obs["rgb"].astype(np.uint8)
         # if "semantic" in obs:
         #     # this may merge some classes
         #     sem = (obs['semantic']/obs['semantic'].max()).astype(np.uint8)
