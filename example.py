@@ -10,6 +10,11 @@ import cv2
 from argparse import ArgumentParser
 import random
 import habitat_sim
+import os
+
+# remove info logging
+os.environ["GLOG_minloglevel"] = "2"
+os.environ["MAGNUM_LOG"] = "quiet"
 
 sys.path.insert(0, "/home/nick/uni/thesis/avalanche-lab/")
 
@@ -49,12 +54,15 @@ if __name__ == "__main__":
     args.add_argument(
         "-i", "--interactive", help="Run demo interactively", action="store_true",
     )
+    args.add_argument(
+        "-n", "--n-episodes", help="Number of episodes to run", type=int, default=3,
+    )
     args = args.parse_args()
-    n_episodes = 3
+    n_episodes = args.n_episodes
 
     # config = AvalancheConfig(from_cli=False)
     config = AvalancheConfig.from_yaml("example_config.yaml")
-    config.scene.max_scene_repeat_episodes = 1
+    # config.scene.max_scene_repeat_episodes = 1
 
     print("Simulator configuration:\n", OmegaConf.to_yaml(config._config))
     with AvalancheEnv(config) as env:
@@ -66,9 +74,11 @@ if __name__ == "__main__":
             type(config.habitat_sim_config.agents[0].action_space),
         )
         print("Current scene:", env.scene_manager._current_scene)
+        print("Available Tasks:", env.tasks)
         end = False
         for _ in range(n_episodes):
             obs = env.reset()
+            print("Current task:", env.current_task)
             print("Initial position", env.agent_position)
             
             visualize(args.interactive, obs)

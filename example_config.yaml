@@ -10,7 +10,7 @@ agent:
 
   # action_space:
     # move_forward:
-      # name: 'some_name'
+      # amount: 3.
 tasks:
   - name: "MyTask"
     # type: "VoidTask"
@@ -18,6 +18,12 @@ tasks:
     object_asset: 'sphere'
     max_steps: 1000
     difficulty: 'TRIVIAL'
+  - name: "MyTask2"
+    type: "VoidTask"
+    max_steps: 10
+
+task_iterator:
+  max_task_repeat_episodes: 1
 
 scene:
   # dataset_paths: ['data/scene_datasets/habitat-test-scenes/']

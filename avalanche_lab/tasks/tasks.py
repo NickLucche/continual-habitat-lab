@@ -34,6 +34,10 @@ class Task:
     def on_task_change(self):
         pass
 
+    def on_task_destroyed(self):
+        # called when current task is getting replaced, 'clean up your mess' call
+        pass
+
     def on_new_episode(self):
         pass
 
@@ -143,8 +147,8 @@ class ObjectNav(Task):
         if object_asset.strip() != '':
             obj_templates_mgr = sim.get_object_template_manager()
             # load object config file (render asset, default mass..)
-            loaded = obj_templates_mgr.load_configs("data/objects/sphere")
-            print("Loaded configs", loaded)
+            # loaded = obj_templates_mgr.load_configs("data/objects/sphere")
+            # print("Loaded configs", loaded)
             # search for an object template by key sub-string
             self.obj_template_handle = obj_templates_mgr.get_template_handles(object_asset)
             print("Template handle", self.obj_template_handle)
@@ -154,9 +158,14 @@ class ObjectNav(Task):
         if not self.keep_goal_fixed:
             return self._generate_goal()
 
+    def on_task_destroyed(self):
+        # remove object from scene
+        if self.obj_id in self.sim.get_existing_object_ids():
+            self.sim.remove_object(self.obj_id) 
+
     def on_task_change(self):
-        # return self.on_new_episode()
-        pass
+        if self.obj_template_handle and self.obj_id not in self.sim.get_existing_object_ids():
+            self.obj_id = self.sim.add_object_by_handle(self.obj_template_handle[0])
 
     def on_scene_change(self):
         # new scene, invalidate generated goals

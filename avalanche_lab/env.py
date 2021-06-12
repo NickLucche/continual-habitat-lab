@@ -14,10 +14,12 @@ class AvalancheEnv(gym.Env):
     sim: Simulator
     task_iterator: TaskIterator
     scene_manager: SceneManager
-    _episode_over: bool = True
-    _episode_counter: int = 0
-    _action_counter: int = 0
-    _episode_start_time: float = None
+    _episode_over: bool
+    _episode_counter: int
+    _action_counter: int
+    _episode_start_time: float
+    _episodes_since_task_change: int
+    _steps_since_task_change: int
     _config: AvalancheConfig
     _last_observation: gym.spaces.dict.Dict
 
@@ -32,13 +34,24 @@ class AvalancheEnv(gym.Env):
 
         self.task_iterator = TaskIterator(config, self.sim)
         self._config = config
+        self._init_bookeeping()
         # TODO: check agent has required sensors to carry out tasks (obs space check)
+
+    def _init_bookeeping(self):
+        self._episode_over = False
+        self._episode_counter = 0
+        self._action_counter = 0
+        self._episode_start_time = None
+        self._episodes_since_task_change = 0
+        self._steps_since_task_change = 0
 
     def reset(self):
         self._episode_start_time = time.time()
         self._episode_over = False
 
         self._episode_counter += 1
+        self._episodes_since_task_change +=1
+
         # task may change on new episode
         task = self._get_task(is_reset=True)
 
@@ -71,7 +84,7 @@ class AvalancheEnv(gym.Env):
         ), "Episode over, call reset before calling step"
         # TODO: single-agent only for now
 
-        # get current task
+        # get current task, it may change on action taken
         task = self._get_task()
         # filter valid action, dynamically define A(s), set of allowed actions at state s
         action_key = action
@@ -87,17 +100,24 @@ class AvalancheEnv(gym.Env):
         self._episode_over = task.goal_test(obs)
 
         self._action_counter += 1
+        self._steps_since_task_change += 1
         return obs, reward, self._episode_over, self.info
 
     def render(self, mode):
         return super().render(mode=mode)
 
     def _get_task(self, is_reset: bool = False) -> Task:
+        prev_task = self.current_task
         task, changed = self.task_iterator.get_task(
-            self._episode_counter, self._action_counter
+            self._episodes_since_task_change, self._steps_since_task_change
         )
         if changed:
+            prev_task.on_task_destroyed()
             task.on_task_change()
+            if is_reset:
+                self._episodes_since_task_change = 1
+            else:
+                self._steps_since_task_change = 1
 
         return task
 
@@ -107,7 +127,7 @@ class AvalancheEnv(gym.Env):
 
     @property
     def current_task(self) -> Task:
-        return self._get_task()
+        return self.task_iterator.current_task
 
     @property
     def action_space(self):

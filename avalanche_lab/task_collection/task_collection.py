@@ -82,3 +82,6 @@ class TaskCollection:
             return self._tasks == o._tasks
         else:
             return self._tasks == o
+
+    def __repr__(self) -> str:
+        return f"[{', '.join([str(t) for t in self._tasks])}]"
