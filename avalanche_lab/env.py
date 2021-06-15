@@ -3,11 +3,13 @@ from avalanche_lab.config import AvalancheConfig
 import gym
 import gym.spaces.dict
 from habitat_sim import Simulator
+from habitat_sim.logging import logger as habitat_logger
 from typing import List, Union
 from avalanche_lab.tasks.tasks import Task
 from avalanche_lab.task_collection.task_iterator import TaskIterator
 import time, logging
 import numpy as np
+from avalanche_lab.logger import avl_logger, logging
 
 
 class AvalancheEnv(gym.Env):
@@ -23,10 +25,14 @@ class AvalancheEnv(gym.Env):
     _config: AvalancheConfig
     _last_observation: gym.spaces.dict.Dict
 
-    def __init__(self, config: AvalancheConfig) -> None:
+    def __init__(self, config: AvalancheConfig, verbose: int=0) -> None:
+        if not verbose:
+            habitat_logger.setLevel(3)
+            avl_logger.setLevel(logging.ERROR)
+
         self.scene_manager = SceneManager(config)
         scene = self.scene_manager.current_scene
-        # config.refresh_config()
+
         self.sim = Simulator(config.make_habitat_sim_config(scene))
         # init agent(s)
         for i in range(len(config.habitat_sim_config.agents)):
@@ -35,7 +41,7 @@ class AvalancheEnv(gym.Env):
         self.task_iterator = TaskIterator(config, self.sim)
         self._config = config
         self._init_bookeeping()
-        # TODO: check agent has required sensors to carry out tasks (obs space check)
+        
 
     def _init_bookeeping(self):
         self._episode_over = False
@@ -57,10 +63,10 @@ class AvalancheEnv(gym.Env):
 
         # scene may also change on new episode
         scene, scene_changed = self.scene_manager.get_scene(self._episode_counter)
-        # TODO: suppress output to console from sim if possible
+
         # reconfigure only on scene change
         if scene_changed:
-            logging.info("Changing scene..")
+            avl_logger.info(f"Changing scene to {scene}..")
             self.sim.reconfigure(
                 self._config.make_habitat_sim_config(scene)
             )
@@ -73,7 +79,7 @@ class AvalancheEnv(gym.Env):
         self._last_observation = self.sim.reset()
         return self._last_observation
 
-    # TODO: continuous actions spaces aren't supported with a nice api by the simulator yet
+    # TODO: continuous actions spaces aren't supported with a nice api by habitat yet
     def step(self, action: Union[str, int], dt: float = 1 / 60):
         # The desired amount of time to advance the physical world.
         assert (
@@ -104,7 +110,7 @@ class AvalancheEnv(gym.Env):
         return obs, reward, self._episode_over, self.info
 
     def render(self, mode):
-        return super().render(mode=mode)
+        return self._last_observation
 
     def _get_task(self, is_reset: bool = False) -> Task:
         prev_task = self.current_task
@@ -139,13 +145,12 @@ class AvalancheEnv(gym.Env):
 
     @property
     def observation_space(self):
-        # TODO: merge of active tasks obs spaces. agent has bunch of sensors,
-        # but some task may require to only use a subset of them
-        pass
+        # obs space only defined by sensor specification
+        return 
 
     @property
     def reward_range(self):
-        pass
+        return self.current_task.reward_range
 
     @property
     def elapsed_time(self):
@@ -184,6 +189,3 @@ class AvalancheEnv(gym.Env):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
-
-    # multitask env will follow later
-

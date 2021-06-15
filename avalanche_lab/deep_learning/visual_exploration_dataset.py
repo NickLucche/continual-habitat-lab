@@ -300,6 +300,7 @@ class AsyncVisualExplorationDataset(Dataset):
         subdir_suffix = self.subdir_suffix if subdir_suffix is None else subdir_suffix
         # tensor transform is done by dataloader
         self.expl_kwargs.update({"to_tensor": False, "batch_size": batch_size})
+        print('args', self.expl_kwargs)
         # create dataloader to explore env
         dataset = VisualExplorationDataset(**self.expl_kwargs)
         # this will result in multiple AvalancheEnv being created
@@ -368,12 +369,12 @@ if __name__ == "__main__":
     # Loading Semantic Stage mesh : ../mp3d/v1/tasks/mp3d/ZMojNkEp431/ZMojNkEp431_semantic.ply
     dataset = AsyncVisualExplorationDataset(
         "/home/nick/datasets/",
-        recompute=True,
+        recompute=False,
         img_resolution=(512, 512),
         size=100,
         load_depth=True,
-        load_semantic=False,
-        semantic=False,
+        load_semantic=True,
+        semantic=True,
         depth=True,
     )
     # for i in range(3):

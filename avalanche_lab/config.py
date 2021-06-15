@@ -1,13 +1,12 @@
 from omegaconf import OmegaConf, MISSING
 import omegaconf
-from typing import Any, Dict, List, Tuple, Optional
+from typing import Any, Dict, List, Tuple, Optional, Union
 from dataclasses import asdict, dataclass, field, make_dataclass
 import habitat_sim
 import enum
-
+import numpy as np
 
 class TASK_CHANGE_BEHAVIOR(enum.IntEnum):
-    # TODO: works with lowercase too?
     FIXED = 0
     NON_FIXED = 1
 
@@ -45,8 +44,7 @@ def make_dynamic_dataclass(class_name: str, base_class):
     from avalanche_lab.registry import registry
     import inspect
 
-    # TODO: substitute None defaults with some other value??
-    # TODO: issue with arguments with same name.
+    # TODO: issue with arguments with same name and different types.
     tasks_classes = registry.get_all("task")
     print("tasks classes", tasks_classes)
     signs = map(lambda C: inspect.getfullargspec(C.__init__), tasks_classes.values())
@@ -111,9 +109,45 @@ class SensorConfig:
     position: List[float] = field(default_factory=lambda: [0.0, 1.5, 0])
     orientation: List[float] = field(default_factory=lambda: [0.0, 0.0, 0.0])
 
-    def from_camera_sensor_spec(self, spec: habitat_sim.CameraSensorSpec):
-        # TODO:
-        pass
+    @staticmethod
+    def from_sensor_spec(spec: habitat_sim.SensorSpec):
+        """ to modify config programmatically using habitat sim way like
+        ```
+            rgb_sensor_spec = habitat_sim.CameraSensorSpec()
+            rgb_sensor_spec.uuid = "rgb"
+            rgb_sensor_spec.sensor_type = habitat_sim.SensorType.COLOR
+            ...
+            config.agent.sensor_specifications.append(SensorConfig.from_sensor_spec(rgb_sensor_spec))
+        ```
+
+        Args:
+            spec (habitat_sim.SensorSpec): habitat sim sensor specification object.
+
+        Raises:
+            NotImplementedError: If the sensor hasn't been added yet.
+        Returns:
+            An instance of SensorConfig.
+        """
+        stype = None
+        if spec.sensor_type == habitat_sim.SensorType.COLOR:
+            stype = Sensors.RGB
+        elif spec.sensor_type == habitat_sim.SensorType.SEMANTIC:
+            stype = Sensors.SEMANTIC
+        elif spec.sensor_type == habitat_sim.SensorType.DEPTH:
+            stype = Sensors.DEPTH
+        else:
+            raise NotImplementedError("Unknown sensor")
+        params = {}
+        for k in SensorConfig.__annotations__.keys():
+            if k != "type":
+                v = getattr(spec, k, None)
+                v = v.tolist() if isinstance(v, np.ndarray) else v
+                params[k] = v
+
+        return SensorConfig(
+            type=stype,
+            **params
+        )
 
 
 from habitat_sim.agent.agent import _default_action_space
@@ -190,45 +224,34 @@ class TaskIteratorConfig:
     task_change_timesteps_high: int = -1
 
 
-
-
-
 class AvalancheConfig(object):
-
 
     _config: OmegaConf
     _sim_cfg: habitat_sim.SimulatorConfiguration
     _agent_cfgs: List[habitat_sim.AgentConfiguration]
 
     def __init__(
-        self, config: OmegaConf = OmegaConf.create(), from_cli: bool = False
+        self,
+        config: Union[OmegaConf, Dict[str, Any]] = OmegaConf.create(),
+        from_cli: bool = False,
     ) -> None:
         # workaround to get dynamic `Tasks` dataclass to be evaluated at config
-        # instatiation time rather than import time (solve import order bug) 
+        # instatiation time rather than import time (solve import order bug)
+        self.DynamicTaskClass = make_dynamic_dataclass("DynamicTaskClass", TaskConfig)
+
         @dataclass
         class BaseConfig:
             experiment_name: str = "MyAvalanceExperiment"
             # tasks is a special dataclass containing all init arguments defined when creating a task
-            tasks: List[make_dynamic_dataclass("Tasks", TaskConfig)] = field(
-            default_factory=lambda: []
-            )
+            tasks: List[self.DynamicTaskClass] = field(default_factory=lambda: [])
             task_iterator: TaskIteratorConfig = TaskIteratorConfig()
             scene: SceneConfig = SceneConfig()
             simulator: SimulatorConfig = SimulatorConfig()
             agent: AgentConfig = AgentConfig()
-        
-        # Base = make_dataclass(
-        #     "Base",
-        #     fields=[
-        #         (
-        #             "tasks",
-        #             List[make_dynamic_dataclass("Tasks", TaskConfig)],
-        #             field(default_factory=lambda: []),
-        #         )
-        #     ],
-        #     bases=(self.BaseConfig,),
-        # )
+
         base_config = OmegaConf.structured(BaseConfig)
+        if type(config) is dict:
+            config = OmegaConf.create(config)
 
         if from_cli:
             config = OmegaConf.merge(config, OmegaConf.from_cli())
@@ -245,12 +268,12 @@ class AvalancheConfig(object):
         # should be updated as well, therefore we re-instantiate it
         # self._override_habitat_sim_config()
         return habitat_sim.Configuration(self._sim_cfg, self._agent_cfgs)
-    
+
     def refresh_config(self):
         return self._override_habitat_sim_config()
 
     def make_habitat_sim_config(self, scene: str):
-        # we need to re-instatiate the habitat-sim configuration or the simulator 
+        # we need to re-instatiate the habitat-sim configuration or the simulator
         # won't recognize differences with previous object
         self._override_habitat_sim_config()
         self._sim_cfg.scene_id = scene
@@ -306,15 +329,6 @@ class AvalancheConfig(object):
             else:
                 setattr(agent_cfg, k, v)
 
-        # FIXME: cant assign a CameraSensorSpec object to configuration
-        # attach RGB visual sensor to the agent
-        # rgb_sensor_spec = habitat_sim.CameraSensorSpec()
-        # rgb_sensor_spec.uuid = "rgb"
-        # rgb_sensor_spec.sensor_type = habitat_sim.SensorType.COLOR
-        # rgb_sensor_spec.resolution = [512, 512]
-        # rgb_sensor_spec.position = [0.0, 2.0, 0.0]
-        # # config.agent.sensor_specifications = [rgb_sensor_spec]
-        # agent_cfg.sensor_specifications = [rgb_sensor_spec]
         self._agent_cfgs = [agent_cfg]
 
     def _create_sensor(self, sensor_spec: SensorConfig):
@@ -330,7 +344,7 @@ class AvalancheConfig(object):
             # set it by default
             camera.sensor_type = sensor_type
             # camera.sensor_subtype = habitat_sim.SensorSubType.PINHOLE
-            
+
             for k, v in spec_dict.items():
                 if k != "type":
                     setattr(camera, k, v)

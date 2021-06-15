@@ -1,31 +1,48 @@
+from avalanche_lab.tasks.tasks import VoidTask
 from avalanche_lab.config import AvalancheConfig
 from avalanche_lab.env import AvalancheEnv
 import pytest
 import numpy as np
 import matplotlib.pyplot as plt
-import os, sys
+from avalanche_lab.utils import suppress_habitat_logging
 
-sys.path.insert(0, "/home/nick/uni/thesis/avalanche-lab/")
+suppress_habitat_logging()
 
-config = AvalancheConfig(from_cli=True)
-with AvalancheEnv(config) as env:
-    # we have two tasks, we'll only need task index 0 and 1
-    task_idx = 0
-    action_names = list(
-        env.scene_manager.habitat_config().agents[0].action_space.keys()
-    )
-    for _ in range(5):
-        env.reset()
-        assert env._curr_task_idx == task_idx, "Task should change at each new episode"
-        task_idx = (task_idx + 1) % 2
-        # while not env.episode_over:
-        for i in range(3):
+def test_empty_config_env():
+    with AvalancheEnv(AvalancheConfig(from_cli=False)) as env:
+        assert isinstance(env.current_task, VoidTask)
+
+
+@pytest.mark.parametrize("n_task", [1, 3, 5])
+def test_env(n_task: int):
+    res = [80, 80]
+    cfg = {
+        "tasks": [{"type": "VoidTask", "max_steps": 1} for i in range(n_task)],
+        "agent": {"sensor_specifications": [{"type": "RGB", 'resolution': res}]},
+    }
+    config = AvalancheConfig(cfg, from_cli=False)
+    with AvalancheEnv(config) as env:
+        task_idx = 0
+        # action_names = list(
+        # env.scene_manager.habitat_config().agents[0].action_space.keys()
+        # )
+        for _ in range(1):
+            env.reset()
+            assert (
+                env.task_iterator._active_task_idx == task_idx
+            ), "Task should change at each new episode"
+
+            task_idx += 1
             # execute random action
-            # env.step(env.action_space.sample())
-            action = np.random.choice(action_names, 1)
+            action = env.action_space.sample()
             print("action", action)
-            observations = env.step(action)
-            rgb = observations["color_sensor"]
-            print(rgb.shape)
-            plt.imshow(rgb)
-            plt.show()
+            observation, _, done, _ = env.step(action)
+            assert done
+            rgb = observation["rgb"]
+            assert rgb.shape[0] == res[0] and rgb.shape[1] == res[1] 
+            assert 'depth' not in observation
+            assert 'semantic' not in observation
+
+
+def test_env_with_custom_tasks():
+    pass

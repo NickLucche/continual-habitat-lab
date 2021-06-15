@@ -1,8 +1,8 @@
 from avalanche_lab.config import AvalancheConfig
 from omegaconf import OmegaConf
 from habitat_sim import Simulator
-from avalanche_lab.tasks import VoidTask
-from avalanche_lab.task_collection import TaskCollection
+from avalanche_lab.tasks.tasks import VoidTask
+from avalanche_lab.task_collection.task_collection import TaskCollection
 import pytest
 from avalanche_lab.registry import registry
 

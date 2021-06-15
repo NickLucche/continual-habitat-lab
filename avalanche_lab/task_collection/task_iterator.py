@@ -6,17 +6,23 @@ from typing import List, Dict, Tuple
 import numpy as np
 from .task_collection import TaskCollection
 
+
 class TaskIterator:
     tasks: TaskCollection
-    _active_task_idx: int 
+    _active_task_idx: int
     _next_task_change_timestep: int
     _config: AvalancheConfig
     _task_change_behavior: TASK_CHANGE_BEHAVIOR
     _task_sampling: TASK_SAMPLING
-    _void_task: VoidTask
 
     # implement fixed and non-fixed timestep task change + sequential/random task sampling
     def __init__(self, config: AvalancheConfig, sim: habitat_sim.Simulator) -> None:
+        # If no tasks are preset, defaults to VoidTask
+        if not len(config.tasks):
+            avl_logger.warning(
+                "No task was specified in config, `VoidTask` will be set as current task"
+            )
+            config.tasks.append(config.DynamicTaskClass(name='No Task', type='VoidTask'))
         self.tasks = TaskCollection.from_config(config, sim)
         # set active task
         self._active_task_idx = 0
@@ -32,14 +38,8 @@ class TaskIterator:
                 self._config.task_iterator.task_change_timesteps_high,
             )
 
-        self._void_task = VoidTask(sim)
-
     # def __next__(self):
     def get_task(self, n_episodes: int, cumulative_steps: int) -> Tuple[Task, bool]:
-        # If no tasks are preset, defaults to VoidTask
-        if len(self.tasks) == 0:
-            return self._void_task, False
-
         # check whether we need to change active task
         change = self._change_task(n_episodes, cumulative_steps)
         if change:
@@ -84,11 +84,9 @@ class TaskIterator:
     def _change_active_task(self):
         if self._task_change_behavior == TASK_CHANGE_BEHAVIOR.NON_FIXED:
             # non-fixed timestep change, sample next timestep in which we change task
-            self._next_task_change_timestep = (
-                np.random.randint(
-                    self._config.task_iterator.task_change_timesteps_low,
-                    self._config.task_iterator.task_change_timesteps_high,
-                )
+            self._next_task_change_timestep = np.random.randint(
+                self._config.task_iterator.task_change_timesteps_low,
+                self._config.task_iterator.task_change_timesteps_high,
             )
 
         prev_task_idx = self._active_task_idx
