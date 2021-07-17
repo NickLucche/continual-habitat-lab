@@ -1,19 +1,21 @@
+from collections import defaultdict
 import habitat_sim
-from avalanche_lab.config import AvalancheConfig
-from avalanche_lab.tasks.tasks import Task
-import logging
-from avalanche_lab.registry import registry
+from continual_habitat_lab.config import ContinualHabitatLabConfig
+from continual_habitat_lab.tasks.tasks import Task
+from continual_habitat_lab.registry import registry
 from typing import List, Dict
 import numpy as np
 
 
 class TaskCollection:
     _tasks: List[Task]
-    _tasks_by_type: Dict[str, List[Task]] = {}
-    _num_tasks: int = 0
+    _tasks_by_type: Dict[str, List[Task]]
+    _num_tasks: int
     # _active_task_idxs:set = set()
 
     def __init__(self, tasks: List[Task]) -> None:
+        self._tasks_by_type = defaultdict(list)
+
         for t in tasks:
             self._add_task_to_type_index(t)
 
@@ -22,7 +24,7 @@ class TaskCollection:
 
     @staticmethod
     def from_config(
-        config: AvalancheConfig, sim: habitat_sim.Simulator
+        config: ContinualHabitatLabConfig, sim: habitat_sim.Simulator
     ) -> "TaskCollection":
         # pass task configuration to task __init__ method
         return TaskCollection(
@@ -36,15 +38,12 @@ class TaskCollection:
 
     def remove_task(self, task: Task):
         self._tasks.remove(task)
-        self._add_task_to_type_index(task)
+        self._remove_task_to_type_index(task)
         self._num_tasks -= 1
 
     def _add_task_to_type_index(self, task: Task):
         ttype = task.__class__.__name__
-        if ttype in self._tasks_by_type:
-            self._tasks_by_type[ttype].append(task)
-        else:
-            self._tasks_by_type[ttype] = [task]
+        self._tasks_by_type[ttype].append(task)
 
     def _remove_task_to_type_index(self, task: Task):
         ttype = task.__class__.__name__

@@ -1,7 +1,7 @@
-from avalanche_lab.tasks.tasks import ObjectNav
+from continual_habitat_lab.tasks.tasks import ObjectNav
 from omegaconf.omegaconf import OmegaConf
-from avalanche_lab.config import AvalancheConfig
-from avalanche_lab.env import AvalancheEnv
+from continual_habitat_lab.config import ContinualHabitatLabConfig
+from continual_habitat_lab.env import ContinualHabitatEnv
 import pytest
 import numpy as np
 import matplotlib.pyplot as plt
@@ -60,12 +60,12 @@ if __name__ == "__main__":
     args = args.parse_args()
     n_episodes = args.n_episodes
 
-    # config = AvalancheConfig(from_cli=False)
-    config = AvalancheConfig.from_yaml("example_config.yaml")
+    # config = ContinualHabitatLabConfig(from_cli=False)
+    config = ContinualHabitatLabConfig.from_yaml("example_config.yaml")
     # config.scene.max_scene_repeat_episodes = 1
 
     print("Simulator configuration:\n", OmegaConf.to_yaml(config._config))
-    with AvalancheEnv(config) as env:
+    with ContinualHabitatEnv(config) as env:
         task_idx = 0
         action_names = list(config.habitat_sim_config.agents[0].action_space.keys())
         print("Available actions", action_names)
@@ -80,7 +80,7 @@ if __name__ == "__main__":
             obs = env.reset()
             print("Current task:", env.current_task)
             print("Initial position", env.agent_position)
-            
+
             visualize(args.interactive, obs)
             # assert env._curr_task_idx == task_idx, "Task should change at each new episode"
             task_idx = (task_idx + 1) % 2
@@ -109,10 +109,10 @@ if __name__ == "__main__":
                         agent_state.position = pos
                         # agent_state.sensor_states = {}
                         # env.sim.get_agent(0).set_state(state, reset_sensors=True)
-                        agent.set_state(agent_state)#, reset_sensors=True)
+                        agent.set_state(agent_state)  # , reset_sensors=True)
                         # env.sim.reset()
                         # to get new obs
-                        action = 'no_op'
+                        action = "no_op"
                     elif keystroke == ord("q") or keystroke == 127:
                         print("Closing..")
                         end = True

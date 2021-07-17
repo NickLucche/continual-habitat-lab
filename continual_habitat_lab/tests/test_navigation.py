@@ -9,8 +9,8 @@ from habitat_sim.logging import logger
 # logger.propagate = False
 # logger = logging.getLogger(habitat_sim.logging.__file__)
 # print('filename', habitat_sim.logging.__file__)
-from avalanche_lab.tasks.navigation import generate_pointnav_episode
-from avalanche_lab.config import AvalancheConfig
+from continual_habitat_lab.tasks.navigation import generate_pointnav_episode
+from continual_habitat_lab.config import ContinualHabitatLabConfig
 import pytest
 import numpy as np
 
@@ -31,7 +31,7 @@ def test_difficulties_episode_gen(gte_ratio, min_gte_ratio, diff: int):
     scene = sceneids[diff]
     if not os.path.exists(scene):
         pytest.skip(f"Must download scene {scene} to run this test!")
-    cfg = AvalancheConfig(from_cli=False)
+    cfg = ContinualHabitatLabConfig(from_cli=False)
     with habitat_sim.Simulator(cfg.make_habitat_sim_config(scene)) as sim:
         sim.initialize_agent(0)
         agent_pos = sim.get_agent(0).get_state().position
@@ -43,7 +43,7 @@ def test_difficulties_episode_gen(gte_ratio, min_gte_ratio, diff: int):
             geodesic_to_euclid_min_ratio=min_gte_ratio,
             number_of_episodes=1,
         )
-        # TODO: this is modified, tasks must repositionate agent 
+        # TODO: this is modified, tasks must repositionate agent
         # check agent position wasn't modified during search
         # assert np.linalg.norm(obs - sim.get_sensor_observations(0)["rgb"]) < 0.01
         # assert np.linalg.norm(agent_pos - sim.get_agent(0).get_state().position) < 0.1

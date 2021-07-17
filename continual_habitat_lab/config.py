@@ -6,6 +6,7 @@ import habitat_sim
 import enum
 import numpy as np
 
+
 class TASK_CHANGE_BEHAVIOR(enum.IntEnum):
     FIXED = 0
     NON_FIXED = 1
@@ -41,7 +42,7 @@ _default_sim_cg = get_default_sim_cfg()
 
 
 def make_dynamic_dataclass(class_name: str, base_class):
-    from avalanche_lab.registry import registry
+    from continual_habitat_lab.registry import registry
     import inspect
 
     # TODO: issue with arguments with same name and different types.
@@ -55,7 +56,11 @@ def make_dynamic_dataclass(class_name: str, base_class):
         arg_counter = 0
         for arg in s.args:
             if arg not in ignored_arguments:
-                fields.append((arg, s.annotations[arg], s.defaults[arg_counter]))
+                # if no default argument value was given set field to None
+                if s.defaults is None:
+                    fields.append((arg, Optional[s.annotations[arg]], None))
+                else:
+                    fields.append((arg, s.annotations[arg], s.defaults[arg_counter]))
                 arg_counter += 1
     print("Tasks fields", fields)
     return make_dataclass(class_name, fields=fields, bases=(base_class,))
@@ -144,10 +149,7 @@ class SensorConfig:
                 v = v.tolist() if isinstance(v, np.ndarray) else v
                 params[k] = v
 
-        return SensorConfig(
-            type=stype,
-            **params
-        )
+        return SensorConfig(type=stype, **params)
 
 
 from habitat_sim.agent.agent import _default_action_space
@@ -224,7 +226,7 @@ class TaskIteratorConfig:
     task_change_timesteps_high: int = -1
 
 
-class AvalancheConfig(object):
+class ContinualHabitatLabConfig(object):
 
     _config: OmegaConf
     _sim_cfg: habitat_sim.SimulatorConfiguration
@@ -259,8 +261,8 @@ class AvalancheConfig(object):
         self._override_habitat_sim_config()
 
     @staticmethod
-    def from_yaml(filepath: str, from_cli=False) -> "AvalancheConfig":
-        return AvalancheConfig(OmegaConf.load(filepath), from_cli=from_cli)
+    def from_yaml(filepath: str, from_cli=False) -> "ContinualHabitatLabConfig":
+        return ContinualHabitatLabConfig(OmegaConf.load(filepath), from_cli=from_cli)
 
     @property
     def habitat_sim_config(self):
@@ -299,7 +301,7 @@ class AvalancheConfig(object):
         agent_cfg = habitat_sim.agent.AgentConfiguration()
         for k, v in self._config.agent.items():
             if k == "action_space":
-                from avalanche_lab.registry import registry
+                from continual_habitat_lab.registry import registry
 
                 # read registered action parameters and instatiate those specified in config
                 print("all", v)

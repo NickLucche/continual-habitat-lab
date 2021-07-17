@@ -1,7 +1,7 @@
 import logging
 
 # from habitat-lab logger
-class AvalancheLogger(logging.Logger):
+class ContinualHabitatLogger(logging.Logger):
     def __init__(
         self,
         name,
@@ -28,6 +28,8 @@ class AvalancheLogger(logging.Logger):
         self.addHandler(filehandler)
 
 
-avl_logger = AvalancheLogger(
-    name="avalanche", level=logging.INFO, format_str="%(asctime)-15s %(message)s"
+chlab_logger = ContinualHabitatLogger(
+    name="continual_habitat",
+    level=logging.INFO,
+    format_str="%(asctime)-15s %(message)s",
 )

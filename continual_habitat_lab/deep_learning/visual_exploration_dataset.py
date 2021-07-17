@@ -10,13 +10,13 @@ from torch.utils.data.dataloader import DataLoader
 import habitat_sim
 from typing import Tuple
 from dataclasses import dataclass
-from avalanche_lab.registry import registry
-from avalanche_lab.tasks.tasks import ObjectNav, Difficulty, NavigationGoal
-from avalanche_lab.config import AvalancheConfig
-from avalanche_lab.env import AvalancheEnv
-from avalanche_lab.tasks.navigation import generate_pointnav_episode
+from continual_habitat_lab.registry import registry
+from continual_habitat_lab.tasks.tasks import ObjectNav, Difficulty, NavigationGoal
+from continual_habitat_lab.config import ContinualHabitatLabConfig
+from continual_habitat_lab.env import ContinualHabitatEnv
+from continual_habitat_lab.tasks.navigation import generate_pointnav_episode
 import random
-from avalanche_lab.logger import avl_logger
+from continual_habitat_lab.logger import chlab_logger
 from typing import List
 import cv2
 from glob import glob
@@ -117,7 +117,9 @@ class VisualExplorationDataset(IterableDataset):
     To provide data, we're going to sample different points per scene and have and greedy
     agent traverse the scene gathering observations as it goes.
     """
-    config: AvalancheConfig = AvalancheConfig(OmegaConf.create(explorer_config))
+    config: ContinualHabitatLabConfig = ContinualHabitatLabConfig(
+        OmegaConf.create(explorer_config)
+    )
     img_resolution: Tuple[int, int] = (128, 128)
     # instance segmentation flag
     semantic: bool = True
@@ -153,7 +155,7 @@ class VisualExplorationDataset(IterableDataset):
         self.step = 0
         self.batches = 0
         print(OmegaConf.to_yaml(self.config._config))
-        self.env = AvalancheEnv(self.config)
+        self.env = ContinualHabitatEnv(self.config)
         self.env.reset()
         # get semantic scene mapping
         scene = self.env.sim.semantic_scene
@@ -249,8 +251,8 @@ class AsyncVisualExplorationDataset(Dataset):
     image dataset.
     Train-test split with data from different scenes is supported.
     """
-    depth_scaling_factor:int = 50000
 
+    depth_scaling_factor: int = 50000
 
     def __init__(
         self,
@@ -272,7 +274,7 @@ class AsyncVisualExplorationDataset(Dataset):
         if not recompute and os.path.exists(
             os.path.join(root, f"avalanche_habitat_dataset{subdir_suffix}")
         ):
-            avl_logger.info(f"Found exisiting dataset folder in {self.root}.")
+            chlab_logger.info(f"Found exisiting dataset folder in {self.root}.")
             self.dataset_loaded = True
             self.dataset_size = len(
                 glob(
@@ -286,11 +288,11 @@ class AsyncVisualExplorationDataset(Dataset):
                 os.mkdir(
                     os.path.join(root, f"avalanche_habitat_dataset{subdir_suffix}")
                 )
-                avl_logger.info(
+                chlab_logger.info(
                     "Pre-exisiting dataset folder not found, creating dataset by exploring environment..."
                 )
             except:
-                avl_logger.info("Recomputing dataset..")
+                chlab_logger.info("Recomputing dataset..")
             self.create_dataset()
             self.dataset_loaded = True
 
@@ -300,10 +302,10 @@ class AsyncVisualExplorationDataset(Dataset):
         subdir_suffix = self.subdir_suffix if subdir_suffix is None else subdir_suffix
         # tensor transform is done by dataloader
         self.expl_kwargs.update({"to_tensor": False, "batch_size": batch_size})
-        print('args', self.expl_kwargs)
+        print("args", self.expl_kwargs)
         # create dataloader to explore env
         dataset = VisualExplorationDataset(**self.expl_kwargs)
-        # this will result in multiple AvalancheEnv being created
+        # this will result in multiple ContinualHabitatEnv being created
         # enable manual batching
         # dl = DataLoader(dataset, batch_size=None, num_workers=num_workers) TODO: avoid collate_fn we dont need tensor
         for bidx, obs in enumerate(dataset):
@@ -311,7 +313,7 @@ class AsyncVisualExplorationDataset(Dataset):
             self._save_tensors_to_images(obs, bidx, batch_size, subdir_suffix)
             if (bidx + 1) * batch_size * len(obs) >= self.dataset_size:
                 break
-        avl_logger.info("Done generating samples")
+        chlab_logger.info("Done generating samples")
 
     def _save_tensors_to_images(
         self,
@@ -323,10 +325,10 @@ class AsyncVisualExplorationDataset(Dataset):
         # save images resulting from batched tensors
         for type_, batched in obs.items():
             # scale distances before saving to png
-            if type_ == 'depth':
-                batched = (batched * self.depth_scaling_factor).astype(np.uint16) 
+            if type_ == "depth":
+                batched = (batched * self.depth_scaling_factor).astype(np.uint16)
             # elif type_ == 'semantic':
-                # batched = batched.astype(np.uint16)
+            # batched = batched.astype(np.uint16)
             for i, img in enumerate(batched):
                 cv2.imwrite(
                     os.path.join(

@@ -1,7 +1,11 @@
 import habitat_sim
-from avalanche_lab.config import AvalancheConfig, TASK_SAMPLING, TASK_CHANGE_BEHAVIOR
-from avalanche_lab.tasks.tasks import Task, VoidTask
-from avalanche_lab.logger import avl_logger
+from continual_habitat_lab.config import (
+    ContinualHabitatLabConfig,
+    TASK_SAMPLING,
+    TASK_CHANGE_BEHAVIOR,
+)
+from continual_habitat_lab.tasks.tasks import Task, VoidTask
+from continual_habitat_lab.logger import chlab_logger
 from typing import List, Dict, Tuple
 import numpy as np
 from .task_collection import TaskCollection
@@ -11,18 +15,22 @@ class TaskIterator:
     tasks: TaskCollection
     _active_task_idx: int
     _next_task_change_timestep: int
-    _config: AvalancheConfig
+    _config: ContinualHabitatLabConfig
     _task_change_behavior: TASK_CHANGE_BEHAVIOR
     _task_sampling: TASK_SAMPLING
 
     # implement fixed and non-fixed timestep task change + sequential/random task sampling
-    def __init__(self, config: AvalancheConfig, sim: habitat_sim.Simulator) -> None:
+    def __init__(
+        self, config: ContinualHabitatLabConfig, sim: habitat_sim.Simulator
+    ) -> None:
         # If no tasks are preset, defaults to VoidTask
         if not len(config.tasks):
-            avl_logger.warning(
+            chlab_logger.warning(
                 "No task was specified in config, `VoidTask` will be set as current task"
             )
-            config.tasks.append(config.DynamicTaskClass(name='No Task', type='VoidTask'))
+            config.tasks.append(
+                config.DynamicTaskClass(name="No Task", type="VoidTask")
+            )
         self.tasks = TaskCollection.from_config(config, sim)
         # set active task
         self._active_task_idx = 0
@@ -98,7 +106,7 @@ class TaskIterator:
                 1, exclude_idxs=[self._active_task_idx]
             )
 
-        avl_logger.info(
+        chlab_logger.info(
             "Current task changed from {} (id: {}) to {} (id: {}).".format(
                 self.tasks[prev_task_idx].__class__.__name__,
                 prev_task_idx,

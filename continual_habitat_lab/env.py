@@ -1,18 +1,18 @@
-from avalanche_lab.scene_manager import SceneManager
-from avalanche_lab.config import AvalancheConfig
+from continual_habitat_lab.scene_manager import SceneManager
+from continual_habitat_lab.config import ContinualHabitatLabConfig
 import gym
 import gym.spaces.dict
 from habitat_sim import Simulator
 from habitat_sim.logging import logger as habitat_logger
 from typing import List, Union
-from avalanche_lab.tasks.tasks import Task
-from avalanche_lab.task_collection.task_iterator import TaskIterator
+from continual_habitat_lab.tasks.tasks import Task
+from continual_habitat_lab.task_collection.task_iterator import TaskIterator
 import time, logging
 import numpy as np
-from avalanche_lab.logger import avl_logger, logging
+from continual_habitat_lab.logger import chlab_logger, logging
 
 
-class AvalancheEnv(gym.Env):
+class ContinualHabitatEnv(gym.Env):
     sim: Simulator
     task_iterator: TaskIterator
     scene_manager: SceneManager
@@ -22,13 +22,13 @@ class AvalancheEnv(gym.Env):
     _episode_start_time: float
     _episodes_since_task_change: int
     _steps_since_task_change: int
-    _config: AvalancheConfig
+    _config: ContinualHabitatLabConfig
     _last_observation: gym.spaces.dict.Dict
 
-    def __init__(self, config: AvalancheConfig, verbose: int=0) -> None:
+    def __init__(self, config: ContinualHabitatLabConfig, verbose: int = 0) -> None:
         if not verbose:
             habitat_logger.setLevel(3)
-            avl_logger.setLevel(logging.ERROR)
+            chlab_logger.setLevel(logging.ERROR)
 
         self.scene_manager = SceneManager(config)
         scene = self.scene_manager.current_scene
@@ -41,7 +41,6 @@ class AvalancheEnv(gym.Env):
         self.task_iterator = TaskIterator(config, self.sim)
         self._config = config
         self._init_bookeeping()
-        
 
     def _init_bookeeping(self):
         self._episode_over = False
@@ -56,7 +55,7 @@ class AvalancheEnv(gym.Env):
         self._episode_over = False
 
         self._episode_counter += 1
-        self._episodes_since_task_change +=1
+        self._episodes_since_task_change += 1
 
         # task may change on new episode
         task = self._get_task(is_reset=True)
@@ -66,10 +65,8 @@ class AvalancheEnv(gym.Env):
 
         # reconfigure only on scene change
         if scene_changed:
-            avl_logger.info(f"Changing scene to {scene}..")
-            self.sim.reconfigure(
-                self._config.make_habitat_sim_config(scene)
-            )
+            chlab_logger.info(f"Changing scene to {scene}..")
+            self.sim.reconfigure(self._config.make_habitat_sim_config(scene))
             # reset position
             # self.sim.initialize_agent(0)
             self.current_task.on_scene_change()
@@ -88,7 +85,6 @@ class AvalancheEnv(gym.Env):
         assert (
             self._episode_over == False
         ), "Episode over, call reset before calling step"
-        # TODO: single-agent only for now
 
         # get current task, it may change on action taken
         task = self._get_task()
@@ -146,7 +142,7 @@ class AvalancheEnv(gym.Env):
     @property
     def observation_space(self):
         # obs space only defined by sensor specification
-        return 
+        return
 
     @property
     def reward_range(self):

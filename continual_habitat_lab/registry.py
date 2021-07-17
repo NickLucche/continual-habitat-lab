@@ -25,29 +25,31 @@ Various decorators for registry different kind of classes with unique keys
 -   Register a sensor: ``@registry.register_sensor``
 """
 
-from avalanche_lab.simulator_interactions.building_blocks import ActionParameters
+from continual_habitat_lab.simulator_interactions.building_blocks import (
+    ActionParameters,
+)
 from habitat_sim.agent.agent import _default_action_space
 import collections
 from typing import Any, Callable, DefaultDict, Optional, Type, Dict, List
 
 import re
 
+
 def _camel_to_snake(name):
     s1 = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
     return re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
+
 
 class Singleton(type):
     _instances: Dict["Singleton", "Singleton"] = {}
 
     def __call__(cls, *args, **kwargs):
         if cls not in cls._instances:
-            cls._instances[cls] = super(Singleton, cls).__call__(
-                *args, **kwargs
-            )
+            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
         return cls._instances[cls]
 
 
-class AvalancheRegistry(metaclass=Singleton):
+class ContinualHabitatRegistry(metaclass=Singleton):
     mapping: DefaultDict[str, Any] = collections.defaultdict(dict)
 
     def __init__(self) -> None:
@@ -65,9 +67,7 @@ class AvalancheRegistry(metaclass=Singleton):
             if assert_type is not None:
                 assert issubclass(
                     to_register, assert_type
-                ), "{} must be a subclass of {}".format(
-                    to_register, assert_type
-                )
+                ), "{} must be a subclass of {}".format(to_register, assert_type)
             register_name = to_register.__name__ if name is None else name
 
             cls.mapping[_type][register_name] = to_register
@@ -108,13 +108,10 @@ class AvalancheRegistry(metaclass=Singleton):
         ), "body_action must be explicitly set to True or False"
         from habitat_sim.agent.controls.controls import SceneNodeControl
 
-
-
         name = _camel_to_snake(controller.__name__) if name is None else name
         return cls._register_impl(
             "move_fn", controller(body_action), name, assert_type=SceneNodeControl
         )
-        
 
     @classmethod
     def register_task(cls, to_register=None, *, name: Optional[str] = None):
@@ -140,27 +137,26 @@ class AvalancheRegistry(metaclass=Singleton):
                 pass
 
         """
-        from avalanche_lab.tasks.tasks import Task
-        return cls._register_impl(
-            "task", to_register, name, assert_type=Task
-        )
+        from continual_habitat_lab.tasks.tasks import Task
+
+        return cls._register_impl("task", to_register, name, assert_type=Task)
+
     @classmethod
     def register_action_params(cls, to_register=None, *, name: Optional[str] = None):
         r"""
 
         """
-        from avalanche_lab.simulator_interactions.building_blocks import ActionParameters
+        from continual_habitat_lab.simulator_interactions.building_blocks import (
+            ActionParameters,
+        )
+
         # assert issubclass(
         #             to_register, ActionParameters
         #         ), "{} must be a subclass of {}".format(
         #             to_register, ActionParameters
         #         )
         name = to_register.action_key if name is None else name
-        return cls._register_impl(
-            "action_params", to_register, name
-        )
-
-
+        return cls._register_impl("action_params", to_register, name)
 
     # @classmethod
     # def register_simulator(
@@ -179,7 +175,6 @@ class AvalancheRegistry(metaclass=Singleton):
     #         @registry.register_simulator
     #         class MySimulator(Simulator):
     #             pass
-
 
     #         # or
 
@@ -234,7 +229,6 @@ class AvalancheRegistry(metaclass=Singleton):
     #         "task_action", to_register, name, assert_type=Action
     #     )
 
-
     # @classmethod
     # def register_action_space_configuration(
     #     cls, to_register=None, *, name: Optional[str] = None
@@ -266,7 +260,7 @@ class AvalancheRegistry(metaclass=Singleton):
 
     @classmethod
     def get_all_action_params(cls) -> Dict[str, ActionParameters]:
-        return cls.get_all('action_params')
+        return cls.get_all("action_params")
 
     @classmethod
     def get_all(cls, key: str) -> Dict[str, Any]:
@@ -304,7 +298,8 @@ class AvalancheRegistry(metaclass=Singleton):
 
 
 from habitat_sim.agent.agent import ActuationSpec
-registry = AvalancheRegistry()
+
+registry = ContinualHabitatRegistry()
 # initialize registry with default action specs
 for k in _default_action_space():
     # spec = v.actuation

@@ -54,10 +54,10 @@ class Task:
         return self._action_space_map[str(action)]
 
 
-from avalanche_lab.registry import AvalancheRegistry
+from continual_habitat_lab.registry import ContinualHabitatRegistry
 import habitat_sim
 
-registry = AvalancheRegistry()
+registry = ContinualHabitatRegistry()
 
 
 @habitat_sim.registry.register_move_fn(body_action=False)
@@ -70,6 +70,7 @@ class NoOp(habitat_sim.SceneNodeControl):
 class NoOpSpec:
     action_key: str = "no_op"
 
+# NOTE: mandatory task __init__ arguments will be passed `None` at runtime if value is not specified in config
 
 # Signatures are important: use max_steps: np.float=np.float('inf') as :int=np.float('inf')
 # will eval to None and that doesnt go well with config system
@@ -77,13 +78,14 @@ class NoOpSpec:
 class VoidTask(Task):
     reward_range = (0.0, 0.0)
     action_space = gym.spaces.discrete.Discrete(4)
-    steps: int = 0
-    # add args kwargs to avoid rasing errors when random keywords are passed from config
+    steps: int
+    # add args kwargs to avoid rasing errors when other keywords (e.g `name`) are passed from config
     def __init__(self, sim: Simulator, max_steps: int = 100, *args, **kwargs) -> None:
         super().__init__(sim, *args, **kwargs)
         self.max_steps = max_steps
         actions_key = ["no_op", "turn_right", "turn_left", "move_forward"]
         self._action_space_map = {str(i): actions_key[i] for i in range(4)}
+        self.steps = 0
 
     def on_new_episode(self):
         self.steps = 0
@@ -115,7 +117,7 @@ class Difficulty(enum.IntEnum):
     HARD = 3.0
 
 
-from avalanche_lab.tasks.navigation import *
+from continual_habitat_lab.tasks.navigation import *
 
 # all tasks arguments MUST have defaults in order to be passed
 # on to the configuration system. Also, make sure to register task before

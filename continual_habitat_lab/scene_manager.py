@@ -1,5 +1,5 @@
 # handle scene switch logic given a list of paths of scene dataset
-from avalanche_lab.config import AvalancheConfig
+from continual_habitat_lab.config import ContinualHabitatLabConfig
 from typing import Iterator, List, Dict
 from pathlib import Path, PosixPath
 import random
@@ -9,7 +9,7 @@ import logging, os
 
 
 class SceneManager:
-    _config: AvalancheConfig
+    _config: ContinualHabitatLabConfig
     _allowed_scene_extensions = ["glb", "ply", "gltf", "obj"]
     _scenes_by_dataset: Dict[str, List[PosixPath]]
     _current_dataset: str
@@ -19,10 +19,12 @@ class SceneManager:
     # for iterating over scenes in a dataset
     _scene_iterator: Iterator
 
-    def __init__(self, config: AvalancheConfig) -> None:
+    def __init__(self, config: ContinualHabitatLabConfig) -> None:
         self._config = config
         if config.scene.scene_path is not None:
-            logging.warning(f"Loading Scene manager with a single scene: {config.scene.scene_path}")
+            logging.warning(
+                f"Loading Scene manager with a single scene: {config.scene.scene_path}"
+            )
             self._single_scene_setup()
         else:
             self._cycle_datasets = self._config.scene.cycle_datasets
@@ -32,7 +34,9 @@ class SceneManager:
 
     def _single_scene_setup(self):
         if not os.path.exists(self._config.scene.scene_path):
-            raise Exception(f'Specified scene path {self._config.scene.scene_path} does not exist! Aborting..')
+            raise Exception(
+                f"Specified scene path {self._config.scene.scene_path} does not exist! Aborting.."
+            )
         self._current_scene = self._config.scene.scene_path
         self._config.scene.max_scene_repeat_episodes = -1
 
@@ -45,7 +49,9 @@ class SceneManager:
             )
         for dirpath in self._config.scene.dataset_paths:
             if not os.path.exists(dirpath):
-                raise Exception(f'Specified dataset path {dirpath} does not exist! Aborting..')
+                raise Exception(
+                    f"Specified dataset path {dirpath} does not exist! Aborting.."
+                )
         self._scenes_by_dataset = OrderedDict()
         # check that every (super) directory contains at least one valid mesh
         for dirpath in self._config.scene.dataset_paths:
