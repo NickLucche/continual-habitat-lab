@@ -130,7 +130,7 @@ class ObjectNav(Task):
     def __init__(
         self,
         sim: Simulator,
-        object_asset: str = "",
+        object_asset: str='sphere',
         difficulty: Difficulty = Difficulty.NORMAL,
         pre_compute_episodes: int = 1,
         keep_goal_fixed: bool = False,
@@ -146,6 +146,7 @@ class ObjectNav(Task):
         self.keep_goal_fixed = keep_goal_fixed
         self.n_episodes = pre_compute_episodes
         self.goals = []
+        self._last_goal_test = None
         self.tolerance = goal_tolerance
         self.object_asset = object_asset
         self.ignore_y = ignore_y_axis
@@ -164,6 +165,7 @@ class ObjectNav(Task):
             self.obj_id = self.sim.add_object_by_handle(self.obj_template_handle[0])
 
     def on_new_episode(self):
+        self._last_goal_test = None
         if not self.keep_goal_fixed:
             return self._generate_goal()
 
@@ -204,15 +206,16 @@ class ObjectNav(Task):
                 number_of_episodes=self.n_episodes,
                 geodesic_to_euclid_starting_ratio=self.difficulty.value,
             )
-            # TODO: test re-positionate agent to original pose
+            
             if self.maint_start_position:
                 agent_state = habitat_sim.AgentState()
                 agent_state.position = agent_state_pos
                 agent_state.rotation = agent_state_rot
                 agent.set_state(agent_state)
 
-            if self.goals is None:
+            if self.goals is None or not len(self.goals):
                 # TODO: Fallback to random point?
+                # FIXME: pre-generate a bunch of points..?
                 raise Exception("Can't generate new goal")
 
         self.goal = self.goals.pop()
@@ -231,11 +234,14 @@ class ObjectNav(Task):
         # don't consider height
         if self.ignore_y:
             agent_pos[1] = self.goal.goal_position[1]
-        return np.linalg.norm(self.goal.goal_position - agent_pos) < self.tolerance
+        self._last_goal_test = np.linalg.norm(self.goal.goal_position - agent_pos) < self.tolerance
+        return self._last_goal_test
 
     def reward_function(
         self, prev_obs: gym.spaces.dict.Dict, curr_obs: gym.spaces.dict.Dict, action
     ):
-        # TODO: not efficient
-        return 0.0 if self.goal_test(None) else -1.0
+        # stored goal test to avoid calling function twice
+        if self._last_goal_test is None:
+            self._last_goal_test = self.goal_test(None)
+        return 0.0 if self._last_goal_test else -1.0
 

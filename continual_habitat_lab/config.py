@@ -200,11 +200,12 @@ class SceneConfig:
     scene_path: Optional[str] = None
     split_dataset_subdirectories: bool = False
     max_scene_repeat_episodes: int = -1
+    max_scene_repeat_steps: int = -1
     # cycle datasets, can't move to other dataset before all scenes have been selected
     cycle_datasets: bool = False
     # sample next scene from any specified dataset
     sample_random_scene: bool = True
-    # TODO: move to sim?
+    # TODO: implement logic
     change_lighting: bool = False
 
 
@@ -266,7 +267,7 @@ class ContinualHabitatLabConfig(object):
 
     @property
     def habitat_sim_config(self):
-        # When we edit simulator or agent habitat sim config, avalanche config
+        # When we edit simulator or agent habitat sim config, habitat config
         # should be updated as well, therefore we re-instantiate it
         # self._override_habitat_sim_config()
         return habitat_sim.Configuration(self._sim_cfg, self._agent_cfgs)

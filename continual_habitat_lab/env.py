@@ -61,7 +61,7 @@ class ContinualHabitatEnv(gym.Env):
         task = self._get_task(is_reset=True)
 
         # scene may also change on new episode
-        scene, scene_changed = self.scene_manager.get_scene(self._episode_counter)
+        scene, scene_changed = self.scene_manager.get_scene(self._episode_counter, self._action_counter)
 
         # reconfigure only on scene change
         if scene_changed:

@@ -16,7 +16,7 @@ import os
 os.environ["GLOG_minloglevel"] = "2"
 os.environ["MAGNUM_LOG"] = "quiet"
 
-sys.path.insert(0, "/home/nick/uni/thesis/avalanche-lab/")
+# sys.path.insert(0, "/home/nick/uni/thesis/avalanche-lab/")
 
 FORWARD_KEY = "w"
 LEFT_KEY = "a"

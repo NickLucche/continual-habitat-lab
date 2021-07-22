@@ -44,6 +44,34 @@ def test_env(n_task: int):
             assert "depth" not in observation
             assert "semantic" not in observation
 
+@pytest.mark.parametrize("n_task", [3, 5])
+def test_task_change(n_task: int):
+    res = [80, 80]
+    max_eps = 2
+
+    cfg = {
+        "tasks": [{"type": "VoidTask", "max_steps": 5} for i in range(n_task)],
+        "agent": {"sensor_specifications": [{"type": "RGB", "resolution": res}]},
+        'task_iterator': {'max_task_repeat_episodes': max_eps}
+    }
+
+    config = ContinualHabitatLabConfig(cfg, from_cli=False)
+    with ContinualHabitatEnv(config) as env:
+        task_idx = 0
+        for ep in range(max_eps*len(config.tasks)):
+            if ep > 0 and ep % max_eps == 0:
+                task_idx += 1
+
+            env.reset()
+            assert (
+                env.task_iterator._active_task_idx == task_idx
+            ), "Task should change"
+            
+            while not env.done:
+                # execute random action
+                action = env.action_space.sample()
+                env.step(action)
+
 
 def test_env_with_custom_tasks():
     pass

@@ -49,7 +49,7 @@ def get_shortest_path_actions(
     if reset_agent:
         agent = sim.get_agent(0)
         # state = agent.get_state()
-        # TODO: reassignment doesnt work must re-create agent state
+        # reassignment doesnt work here we must re-create agent state for habitat sim
         agent_state = habitat_sim.AgentState()
         agent_state.position = source_position
         agent_state.rotation = source_rotation
@@ -73,7 +73,7 @@ def get_shortest_path_actions(
     shortest_path = None
     try:
         shortest_path = follower.find_path(goal_position)
-    except GreedyFollowerError as e:
+    except GreedyFollowerError:
         logging.error(
             f"Unable to find shortest path to target position {goal_position} from {source_position}"
         )
@@ -82,8 +82,8 @@ def get_shortest_path_actions(
 
 
 def is_compatible_episode(
-    s,  #: Sequence[float],
-    t,  #: Sequence[float],
+    s: Sequence[float],
+    t: Sequence[float],
     sim: habitat_sim.Simulator,
     further_than: float,
     closer_than: float,
@@ -120,7 +120,8 @@ def generate_pointnav_episode(
     furthest_dist_limit: float = 50,
     geodesic_to_euclid_starting_ratio: float = 2.0,
     geodesic_to_euclid_min_ratio: float = 1.0,
-    number_retries_per_target: int = 10,
+    number_retries_per_target: int = 100,
+    number_retries_per_source: int = 10,
 ) -> Generator[NavigationGoal, None, None]:
     r"""Generator function that generates PointGoal navigation episodes.
 
@@ -153,7 +154,7 @@ def generate_pointnav_episode(
     :return: navigation episode that satisfy specified distribution for
     currently loaded into simulator scene.
     """
-    MAX_SOURCE_SAMPLING = 10
+    MAX_SOURCE_SAMPLING = number_retries_per_source
 
     gte_ratios = np.linspace(
         geodesic_to_euclid_starting_ratio,
@@ -164,7 +165,7 @@ def generate_pointnav_episode(
     # gte_ratios[:number_retries_per_target//5] = gte_ratios[0]
     # gte_ratios[-number_retries_per_target//5:] = gte_ratios[-1]
     goals = []
-    for ep in range(number_of_episodes):
+    for _ in range(number_of_episodes):
         # query NavMesh navigable area using PathFinder API
         if not sim.pathfinder.is_loaded:
             raise Exception(
@@ -173,7 +174,7 @@ def generate_pointnav_episode(
         pathfinder = sim.pathfinder
         found = False
         if agent_position is None:
-            for i in range(MAX_SOURCE_SAMPLING):
+            for _ in range(MAX_SOURCE_SAMPLING):
                 # first sample source position if not given
                 source_position = pathfinder.get_random_navigable_point()
                 # print("source", source_position)

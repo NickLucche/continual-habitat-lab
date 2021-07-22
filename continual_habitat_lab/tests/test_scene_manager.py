@@ -32,11 +32,24 @@ def test_scene_change_every_ep():
         else:
             assert changed == False
 
+def test_scene_change_every_step():
+    config = ContinualHabitatLabConfig(from_cli=False)
+    config.scene.max_scene_repeat_episodes = -1
+    config.scene.max_scene_repeat_steps = 1
+    skip_with_no_datasets(config)
+    sm = SceneManager(config)
+    # simulate simulator steps 
+    for step in range(10):
+        _, changed = sm.get_scene(-1, step)
+        if step > 0:
+            assert changed == True
+        else:
+            assert changed == False
+
 
 def test_gibson():
     config = ContinualHabitatLabConfig(from_cli=False)
-    # TODO: change
-    config.scene.dataset_paths = ["/home/nick/datasets/habitat/gibson/"]
+    config.scene.dataset_paths = ["data/gibson/"]
     config.scene.max_scene_repeat_episodes = 1
     skip_with_no_datasets(config)
     sm = SceneManager(config)

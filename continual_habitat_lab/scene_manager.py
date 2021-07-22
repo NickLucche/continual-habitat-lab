@@ -13,7 +13,7 @@ class SceneManager:
     _allowed_scene_extensions = ["glb", "ply", "gltf", "obj"]
     _scenes_by_dataset: Dict[str, List[PosixPath]]
     _current_dataset: str
-    _current_scene: str = None
+    _current_scene: str
     # for cycling though datasets
     _dataset_iterator: Iterator
     # for iterating over scenes in a dataset
@@ -84,7 +84,7 @@ class SceneManager:
                 "Make sure at least one flag among `cycle_datasets` and `sample_random_scene` is set"
             )
 
-    def get_scene(self, episode_counter: int):
+    def get_scene(self, episode_counter: int, step_counter: int = -1):
         """
         Return scene to use as specified by the configuration policy.
 
@@ -93,7 +93,7 @@ class SceneManager:
         """
 
         # check whether we need to change scene
-        changed = self._change_scene(episode_counter)
+        changed = self._change_scene(episode_counter, step_counter)
         if changed:
             if self._cycle_datasets:
                 scene = self._iterate_dataset()
@@ -123,9 +123,12 @@ class SceneManager:
             scene_iter = self._scene_iterator
         return next(scene_iter, None)
 
-    def _change_scene(self, ep_counter: int):
+    def _change_scene(self, ep_counter: int, step_counter: int):
         max_ep = self._config.scene.max_scene_repeat_episodes
+        max_steps = self._config.scene.max_scene_repeat_steps
         if max_ep > 0 and ep_counter > 0 and ep_counter % max_ep == 0:
+            return True
+        if max_steps > 0 and step_counter > 0 and step_counter % max_ep == 0:
             return True
         return False
 

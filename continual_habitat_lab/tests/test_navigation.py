@@ -1,4 +1,7 @@
+from continual_habitat_lab.tasks.tasks import ObjectNav
 import os, logging
+
+from omegaconf.omegaconf import OmegaConf
 
 # remove info logging
 os.environ["GLOG_minloglevel"] = "3"
@@ -24,9 +27,9 @@ def test_difficulties_episode_gen(gte_ratio, min_gte_ratio, diff: int):
     sceneids = [
         "data/scene_datasets/habitat-test-scenes/skokloster-castle.glb",
         # we'll need a more complex scene to have a higher chance of getting harder episode
-        "/home/nick/datasets/habitat/gibson/gibson/Cokeville.glb",
-        "/home/nick/datasets/habitat/gibson/gibson/Cokeville.glb",
-        "/home/nick/datasets/habitat/gibson/gibson/Cokeville.glb",
+        "data/gibson/train/Cokeville.glb",
+        "data/gibson/train/Cokeville.glb",
+        "data/gibson/train/Cokeville.glb",
     ]
     scene = sceneids[diff]
     if not os.path.exists(scene):
@@ -43,7 +46,7 @@ def test_difficulties_episode_gen(gte_ratio, min_gte_ratio, diff: int):
             geodesic_to_euclid_min_ratio=min_gte_ratio,
             number_of_episodes=1,
         )
-        # TODO: this is modified, tasks must repositionate agent
+        # NOTE: agent state is modified, task must repositionate agent explicitely
         # check agent position wasn't modified during search
         # assert np.linalg.norm(obs - sim.get_sensor_observations(0)["rgb"]) < 0.01
         # assert np.linalg.norm(agent_pos - sim.get_agent(0).get_state().position) < 0.1
@@ -58,4 +61,25 @@ def test_difficulties_episode_gen(gte_ratio, min_gte_ratio, diff: int):
             assert ep._num_iterations_to_find <= num_iterations[diff]
             # assert path not empty
             assert ep.shortest_path is not None
+
+
+def test_object_nav_generation():
+    n_eps = 3
+    from continual_habitat_lab.env import ContinualHabitatEnv
+
+    config = {
+        "tasks": [
+            {"type": "ObjectNav", "name": "TestObjTask", "pre_compute_episodes": n_eps}
+        ]
+    }
+    config = ContinualHabitatLabConfig(OmegaConf.create(config), from_cli=False)
+    with ContinualHabitatEnv(config) as env:
+        assert isinstance(env.current_task, ObjectNav)
+        task: ObjectNav = env.current_task
+        env.reset()
+        for _ in range(10):
+            assert task.goal is not None
+            assert len(task.goals) and len(task.goals) <= (n_eps - 1)
+            task.goals = []
+            task._generate_goal()
 
