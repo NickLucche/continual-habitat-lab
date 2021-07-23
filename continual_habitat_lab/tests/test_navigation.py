@@ -38,7 +38,7 @@ def test_difficulties_episode_gen(gte_ratio, min_gte_ratio, diff: int):
     with habitat_sim.Simulator(cfg.make_habitat_sim_config(scene)) as sim:
         sim.initialize_agent(0)
         agent_pos = sim.get_agent(0).get_state().position
-        obs = sim.get_sensor_observations(0)["rgb"]
+        obs = sim.get_sensor_observations(0)["rgba"]
         eps = generate_pointnav_episode(
             sim,
             number_retries_per_target=100,
@@ -48,7 +48,7 @@ def test_difficulties_episode_gen(gte_ratio, min_gte_ratio, diff: int):
         )
         # NOTE: agent state is modified, task must repositionate agent explicitely
         # check agent position wasn't modified during search
-        # assert np.linalg.norm(obs - sim.get_sensor_observations(0)["rgb"]) < 0.01
+        # assert np.linalg.norm(obs - sim.get_sensor_observations(0)["rgba"]) < 0.01
         # assert np.linalg.norm(agent_pos - sim.get_agent(0).get_state().position) < 0.1
         num_iterations = [20, 80, 120, 200]
         for ep in eps:

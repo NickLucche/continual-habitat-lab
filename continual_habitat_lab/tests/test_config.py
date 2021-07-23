@@ -25,7 +25,7 @@ def test_default_config_instance():
 def create_from_dict():
     cfg = {
         "tasks": [{"type": "VoidTask", "max_steps": 1}],
-        "agent": {"sensor_specifications": [{"type": "RGB", "resolution": [128, 128]}]},
+        "agent": {"sensor_specifications": [{"type": "RGBA", "resolution": [128, 128]}]},
         "task_iterator": dict(max_task_repeat_episodes=1),
         "scene": {"scene_path": "/my/scene/path"},
     }

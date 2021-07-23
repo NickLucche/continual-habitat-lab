@@ -3,7 +3,7 @@ simulator:
 agent:
   height: 1.4
   sensor_specifications:
-    - type: RGB
+    - type: RGBA
       resolution: [1024, 1024]
     - type: SEMANTIC
       resolution: [1024, 1024]

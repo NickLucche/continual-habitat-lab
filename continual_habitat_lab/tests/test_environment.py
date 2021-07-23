@@ -19,7 +19,7 @@ def test_env(n_task: int):
     res = [80, 80]
     cfg = {
         "tasks": [{"type": "VoidTask", "max_steps": 1} for i in range(n_task)],
-        "agent": {"sensor_specifications": [{"type": "RGB", "resolution": res}]},
+        "agent": {"sensor_specifications": [{"type": "RGBA", "resolution": res}]},
     }
     config = ContinualHabitatLabConfig(cfg, from_cli=False)
     with ContinualHabitatEnv(config) as env:
@@ -39,7 +39,7 @@ def test_env(n_task: int):
             print("action", action)
             observation, _, done, _ = env.step(action)
             assert done
-            rgb = observation["rgb"]
+            rgb = observation["rgba"]
             assert rgb.shape[0] == res[0] and rgb.shape[1] == res[1]
             assert "depth" not in observation
             assert "semantic" not in observation
@@ -51,7 +51,7 @@ def test_task_change(n_task: int):
 
     cfg = {
         "tasks": [{"type": "VoidTask", "max_steps": 5} for i in range(n_task)],
-        "agent": {"sensor_specifications": [{"type": "RGB", "resolution": res}]},
+        "agent": {"sensor_specifications": [{"type": "RGBA", "resolution": res}]},
         'task_iterator': {'max_task_repeat_episodes': max_eps}
     }
 

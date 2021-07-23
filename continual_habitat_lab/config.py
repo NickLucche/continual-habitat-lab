@@ -95,17 +95,16 @@ _default_agent_cfg = get_default_agent_cfg()
 
 
 class Sensors(enum.IntEnum):
-    RGB = 0
+    RGBA = 0
     DEPTH = 1
     SEMANTIC = 2
-    RGBA = 3
-    GPS = 4
+    GPS = 3
 
 
 @dataclass
 class SensorConfig:
     # way to quickly setup sensors with good defaults
-    type: Sensors = Sensors.RGB
+    type: Sensors = Sensors.RGBA
     uuid: str = ""
     # sensor_type: habitat_sim.SensorType = habitat_sim.SensorType.COLOR
     # sensor_subtype: habitat_sim.SensorSubType = habitat_sim.SensorSubType.PINHOLE
@@ -119,7 +118,7 @@ class SensorConfig:
         """ to modify config programmatically using habitat sim way like
         ```
             rgb_sensor_spec = habitat_sim.CameraSensorSpec()
-            rgb_sensor_spec.uuid = "rgb"
+            rgb_sensor_spec.uuid = "rgba"
             rgb_sensor_spec.sensor_type = habitat_sim.SensorType.COLOR
             ...
             config.agent.sensor_specifications.append(SensorConfig.from_sensor_spec(rgb_sensor_spec))
@@ -135,7 +134,7 @@ class SensorConfig:
         """
         stype = None
         if spec.sensor_type == habitat_sim.SensorType.COLOR:
-            stype = Sensors.RGB
+            stype = Sensors.RGBA
         elif spec.sensor_type == habitat_sim.SensorType.SEMANTIC:
             stype = Sensors.SEMANTIC
         elif spec.sensor_type == habitat_sim.SensorType.DEPTH:
@@ -353,7 +352,7 @@ class ContinualHabitatLabConfig(object):
                     setattr(camera, k, v)
             return camera
 
-        if sensor_spec.type == Sensors.RGB:
+        if sensor_spec.type == Sensors.RGBA:
             return _create_camera(sensor_spec, habitat_sim.SensorType.COLOR)
         elif sensor_spec.type == Sensors.SEMANTIC:
             return _create_camera(sensor_spec, habitat_sim.SensorType.SEMANTIC)

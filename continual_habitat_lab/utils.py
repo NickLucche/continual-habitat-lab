@@ -1,6 +1,6 @@
 import sys, os
 def suppress_habitat_logging():
-    os.environ["GLOG_minloglevel"] = "3"
+    os.environ["GLOG_minloglevel"] = "4"
     os.environ["MAGNUM_LOG"] = "quiet"
 
 def enable_habitat_logging(log_level: int):

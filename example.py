@@ -31,7 +31,7 @@ RANDOM_TP = "t"
 
 def visualize(flag: bool, obs):
     if flag:
-        img = obs["rgb"].astype(np.uint8)
+        img = obs["rgba"].astype(np.uint8)
         # if "semantic" in obs:
         #     # this may merge some classes
         #     sem = (obs['semantic']/obs['semantic'].max()).astype(np.uint8)
@@ -46,7 +46,7 @@ def visualize(flag: bool, obs):
         #         ]
         #     )
         #     print('img shape', img.shape)
-        cv2.imshow("RGB", img)
+        cv2.imshow("RGBA", img)
 
 
 if __name__ == "__main__":

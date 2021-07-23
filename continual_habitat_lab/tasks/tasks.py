@@ -1,4 +1,5 @@
 # easily set up tasks in any scene without so much as a sweat
+import collections
 from typing import Dict
 from habitat_sim import Simulator
 import gym.spaces.dict
@@ -7,6 +8,7 @@ from gym.spaces.space import Space
 import logging
 import numpy as np
 import enum
+import random
 
 
 class Task:
@@ -137,6 +139,7 @@ class ObjectNav(Task):
         goal_tolerance: float = 1.0,
         ignore_y_axis: bool = True,
         maintain_start_position: bool = False,
+        past_goals_buffer_size:int = 1000,
         *args,
         **kwargs,
     ) -> None:
@@ -152,6 +155,7 @@ class ObjectNav(Task):
         self.ignore_y = ignore_y_axis
         self.maint_start_position = maintain_start_position
         self.obj_id = -1
+        self._past_goal_buffer = collections.deque(maxlen=past_goals_buffer_size)
         if object_asset.strip() != "":
             obj_templates_mgr = sim.get_object_template_manager()
             # load object config file (render asset, default mass..)
@@ -213,13 +217,14 @@ class ObjectNav(Task):
                 agent_state.rotation = agent_state_rot
                 agent.set_state(agent_state)
 
+            self._past_goal_buffer.extend(self.goals)
+
             if self.goals is None or not len(self.goals):
-                # TODO: Fallback to random point?
-                # FIXME: pre-generate a bunch of points..?
-                raise Exception("Can't generate new goal")
+                # Fallback to previously generated goals
+                self.goals = random.sample(self._past_goal_buffer, min(len(self._past_goal_buffer), self.n_episodes))
 
         self.goal = self.goals.pop()
-        print("obj ids", self.sim.get_existing_object_ids())
+        # print("obj ids", self.sim.get_existing_object_ids())
         # assert self.obj_id in self.sim.get_existing_object_ids()
 
         # move object to goal position

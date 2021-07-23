@@ -94,7 +94,7 @@ explorer_config = {
             "turn_left": {"amount": 45.0},
         },
         "sensor_specifications": [
-            {"type": "RGB"},
+            {"type": "RGBA"},
             {"type": "SEMANTIC"},
             {"type": "DEPTH"},
         ],

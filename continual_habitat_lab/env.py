@@ -1,7 +1,9 @@
 from continual_habitat_lab.scene_manager import SceneManager
-from continual_habitat_lab.config import ContinualHabitatLabConfig
+from continual_habitat_lab.config import ContinualHabitatLabConfig, Sensors
 import gym
 import gym.spaces.dict
+from gym.spaces.box import Box
+
 from habitat_sim import Simulator
 from habitat_sim.logging import logger as habitat_logger
 from typing import List, Union
@@ -16,6 +18,7 @@ class ContinualHabitatEnv(gym.Env):
     sim: Simulator
     task_iterator: TaskIterator
     scene_manager: SceneManager
+    observation_space: gym.spaces.dict.Dict
     _episode_over: bool
     _episode_counter: int
     _action_counter: int
@@ -42,6 +45,9 @@ class ContinualHabitatEnv(gym.Env):
         self._config = config
         self._init_bookeeping()
 
+        # obs space defined by `sensor_specifications`
+        self.observation_space = self._compute_obs_space()
+
     def _init_bookeeping(self):
         self._episode_over = False
         self._episode_counter = 0
@@ -61,7 +67,9 @@ class ContinualHabitatEnv(gym.Env):
         task = self._get_task(is_reset=True)
 
         # scene may also change on new episode
-        scene, scene_changed = self.scene_manager.get_scene(self._episode_counter, self._action_counter)
+        scene, scene_changed = self.scene_manager.get_scene(
+            self._episode_counter, self._action_counter
+        )
 
         # reconfigure only on scene change
         if scene_changed:
@@ -70,6 +78,8 @@ class ContinualHabitatEnv(gym.Env):
             # reset position
             # self.sim.initialize_agent(0)
             self.current_task.on_scene_change()
+            # semantic classes may change with new scene
+            self.observation_space = self._compute_obs_space()
 
         task.on_new_episode()
 
@@ -123,6 +133,52 @@ class ContinualHabitatEnv(gym.Env):
 
         return task
 
+    def _set_semantic_scene_mapping(self):
+        """
+            Set semantic scene data structures useful for mapping from semantic classes/categories
+            to labels or object id to class. 
+        """
+        scene = self.sim.semantic_scene
+        # categories list
+        if scene.categories is None or not len(scene.categories):
+            chlab_logger.error(
+                f"Current scene ({self.scene_manager.current_scene}) does not contain semantic information but a semantic sensor is still being used by the agent!"
+            )
+        self._obj_category_id_to_name = {
+            cat.index(): cat.name() for cat in scene.categories if cat is not None
+        }
+        self._obj_category_id_to_name[0] = "unknown"
+
+        self._object_id_to_category_id = {
+            int(obj.id.split("_")[-1]): obj.category.index()
+            for obj in scene.objects
+            if obj and obj.category is not None
+        }
+        # unknown class is always included
+        self._object_id_to_category_id[0] = 0
+        self.n_semantic_classes = len(self._obj_category_id_to_name)
+
+    def _compute_obs_space(self):
+        spaces = {}
+        # TODO: support broader range of sensors more flexibly (e.g. GPS)
+        for sensor in self._config.agent.sensor_specifications:
+            if sensor.type == Sensors.RGBA:
+                s = Box(
+                    low=0, high=255, shape=[*sensor["resolution"], 4], dtype=np.uint8
+                )
+            elif sensor.type == Sensors.SEMANTIC:
+                # TODO: support instance segmentation
+                self._set_semantic_scene_mapping()
+                s = Box(low=0, high=self.n_semantic_classes-1, shape=sensor["resolution"], dtype=np.uint32)
+            elif sensor.type == Sensors.DEPTH:
+                s = Box(low=0., high=np.float('inf'), shape=sensor["resolution"], dtype=np.float32)
+            else:
+                raise ValueError(f"Unsupported sensor type {sensor.type}")
+
+            spaces[sensor["uuid"]] = s
+
+        return gym.spaces.dict.Dict(spaces)
+
     @property
     def tasks(self) -> List[Task]:
         return self.task_iterator.tasks
@@ -138,11 +194,6 @@ class ContinualHabitatEnv(gym.Env):
     # @property
     # def agent_action_space(self):
     # return self._config.habitat_sim_config.agents[0].action_space
-
-    @property
-    def observation_space(self):
-        # obs space only defined by sensor specification
-        return
 
     @property
     def reward_range(self):
