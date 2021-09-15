@@ -204,8 +204,6 @@ class SceneConfig:
     cycle_datasets: bool = False
     # sample next scene from any specified dataset
     sample_random_scene: bool = True
-    # TODO: implement logic
-    change_lighting: bool = False
 
 
 @dataclass

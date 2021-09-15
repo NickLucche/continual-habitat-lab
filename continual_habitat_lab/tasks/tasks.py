@@ -1,11 +1,10 @@
-# easily set up tasks in any scene without so much as a sweat
 import collections
 from typing import Dict
 from habitat_sim import Simulator
 import gym.spaces.dict
 import gym.spaces.discrete
 from gym.spaces.space import Space
-import logging
+from continual_habitat_lab.logger import chlab_logger
 import numpy as np
 import enum
 import random
@@ -22,7 +21,7 @@ class Task:
     def __init__(self, sim: Simulator, name: str = None, *args, **kwargs) -> None:
         self.sim = sim
         actions_key = ["turn_right", "turn_left", "move_forward"]
-        self._action_space_map = {str(i): actions_key[i] for i in range(3)}
+        self._action_space_map = {i: actions_key[i] for i in range(3)}
         self.name = self.__class__.__name__ if name is None else name
 
     def goal_test(self, obs: gym.spaces.dict.Dict) -> bool:
@@ -53,7 +52,7 @@ class Task:
             raise Exception(
                 f"action {action} is not a valid action! (Action space: {self.action_space})."
             )
-        return self._action_space_map[str(action)]
+        return self._action_space_map[action]
 
 
 from continual_habitat_lab.registry import ContinualHabitatRegistry
@@ -74,8 +73,8 @@ class NoOpSpec:
 
 # NOTE: mandatory task __init__ arguments will be passed `None` at runtime if value is not specified in config
 
-# Signatures are important: use max_steps: np.float=np.float('inf') as :int=np.float('inf')
-# will eval to None and that doesnt go well with config system
+# Type signatures are important: use `max_steps:np.float = np.float('inf')` and NOT `:int=np.float('inf')`
+# or it will eval to None and that doesnt go well with config system
 @registry.register_task
 class VoidTask(Task):
     reward_range = (0.0, 0.0)
@@ -86,7 +85,7 @@ class VoidTask(Task):
         super().__init__(sim, *args, **kwargs)
         self.max_steps = max_steps
         actions_key = ["no_op", "turn_right", "turn_left", "move_forward"]
-        self._action_space_map = {str(i): actions_key[i] for i in range(4)}
+        self._action_space_map = {i: actions_key[i] for i in range(4)}
         self.steps = 0
 
     def on_new_episode(self):
@@ -104,12 +103,12 @@ class VoidTask(Task):
     def action_space_mapping(self, action: int) -> str:
         # you can access available action using the registry `habitat_sim.registry._mapping['move_fn'].keys()`
         if action not in self.action_space:
-            logging.warning(
+            chlab_logger.warning(
                 f"action {action} is not a valid action! (Action space: {self.action_space}). Default to `no_op` action."
             )
             # default to no_op action
             action = 0
-        return self._action_space_map[str(action)]
+        return self._action_space_map[action]
 
 
 class Difficulty(enum.IntEnum):
@@ -157,10 +156,17 @@ class ObjectNav(Task):
         self.obj_id = -1
         self._past_goal_buffer = collections.deque(maxlen=past_goals_buffer_size)
         if object_asset.strip() != "":
+            object_asset = object_asset.replace('.glb', '')
             obj_templates_mgr = sim.get_object_template_manager()
             # load object config file (render asset, default mass..)
-            # loaded = obj_templates_mgr.load_configs("data/objects/sphere")
-            # print("Loaded configs", loaded)
+            loaded = obj_templates_mgr.load_configs(object_asset)
+            if not len(loaded):
+                # try to load object config by removing words such as '_convex'
+                obj_templates_mgr.load_configs(object_asset.rsplit('_', 1)[0])
+            if not len(loaded):
+                chlab_logger.error(f"Unable to load config for asset {object_asset}. Make sure they're in the same folder and share the same prefix with the asset")
+            print("Loaded configs", loaded)
+            print("To load:", object_asset)
             # search for an object template by key sub-string
             self.obj_template_handle = obj_templates_mgr.get_template_handles(
                 object_asset

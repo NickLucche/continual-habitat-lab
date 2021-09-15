@@ -5,8 +5,10 @@ agent:
   sensor_specifications:
     - type: RGBA
       resolution: [1024, 1024]
+      position: [0., 0.6, 0.,]
     - type: SEMANTIC
       resolution: [1024, 1024]
+      
 
   # action_space:
     # move_forward:
@@ -15,7 +17,7 @@ tasks:
   - name: "MyTask"
     # type: "VoidTask"
     type: "ObjectNav"
-    object_asset: 'sphere'
+    object_asset: '/home/nick/uni/thesis/continual-habitat-lab/data/objects/sphere'
     max_steps: 1000
     difficulty: 'TRIVIAL'
   - name: "MyTask2"

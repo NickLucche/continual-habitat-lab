@@ -216,6 +216,14 @@ class ContinualHabitatEnv(gym.Env):
         return self.sim.get_agent(0).get_state().position
 
     @property
+    def agent_rotation(self):
+        return self.sim.get_agent(0).get_state().rotation
+
+    @property
+    def agent_state(self):
+        return self.sim.get_agent(0).get_state()
+
+    @property
     def info(self):
         return {
             "episode_counter": self._episode_counter,

@@ -1,16 +1,13 @@
 from continual_habitat_lab.tasks.tasks import ObjectNav
 from omegaconf.omegaconf import OmegaConf
-from continual_habitat_lab.config import ContinualHabitatLabConfig
-from continual_habitat_lab.env import ContinualHabitatEnv
-import pytest
 import numpy as np
 import matplotlib.pyplot as plt
-import os, sys
+import os
 import cv2
 from argparse import ArgumentParser
-import random
 import habitat_sim
 import os
+from continual_habitat_lab import ContinualHabitatLabConfig, ContinualHabitatEnv
 
 # remove info logging
 os.environ["GLOG_minloglevel"] = "2"
@@ -46,6 +43,11 @@ def visualize(flag: bool, obs):
         #         ]
         #     )
         #     print('img shape', img.shape)
+        print(img.shape, obs.keys())
+        if 'collided' in obs:
+            print('collided', obs['collided'])
+        print(img[..., 3].max(), img[..., 3].min(), img[..., 3].mean())
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         cv2.imshow("RGBA", img)
 
 
@@ -73,7 +75,7 @@ if __name__ == "__main__":
             config.habitat_sim_config.agents[0].action_space,
             type(config.habitat_sim_config.agents[0].action_space),
         )
-        print("Current scene:", env.scene_manager._current_scene)
+        print("Current scene:", env.current_scene)
         print("Available Tasks:", env.tasks)
         end = False
         for _ in range(n_episodes):
