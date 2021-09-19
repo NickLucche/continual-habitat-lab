@@ -28,7 +28,7 @@ RANDOM_TP = "t"
 
 def visualize(flag: bool, obs):
     if flag:
-        img = obs["rgba"].astype(np.uint8)
+        img = obs["rgba"]#.astype(np.uint8)
         # if "semantic" in obs:
         #     # this may merge some classes
         #     sem = (obs['semantic']/obs['semantic'].max()).astype(np.uint8)
@@ -47,7 +47,9 @@ def visualize(flag: bool, obs):
         if 'collided' in obs:
             print('collided', obs['collided'])
         print(img[..., 3].max(), img[..., 3].min(), img[..., 3].mean())
+        img = img[..., :3].astype(np.uint8)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        print(img.shape)
         cv2.imshow("RGBA", img)
 
 

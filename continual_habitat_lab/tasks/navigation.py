@@ -1,7 +1,7 @@
 import habitat_sim
 from typing import List, Tuple, Dict, Sequence, Union, Generator
 import numpy as np
-import logging
+from continual_habitat_lab.logger import chlab_logger
 from habitat_sim.nav import GreedyGeodesicFollower
 from habitat_sim.errors import GreedyFollowerError
 from dataclasses import dataclass
@@ -74,7 +74,7 @@ def get_shortest_path_actions(
     try:
         shortest_path = follower.find_path(goal_position)
     except GreedyFollowerError:
-        logging.error(
+        chlab_logger.error(
             f"Unable to find shortest path to target position {goal_position} from {source_position}"
         )
 
@@ -190,7 +190,7 @@ def generate_pointnav_episode(
                     found = True
                     break
             if not found:
-                logging.error("Unable to sample valid starting position")
+                chlab_logger.error("Unable to sample valid starting position")
                 return None
         else:
             source_position = agent_position
@@ -242,7 +242,7 @@ def generate_pointnav_episode(
                 )
             )
         else:
-            logging.error(
+            chlab_logger.error(
                 f"Unable to generate a path for current scene with provided configuration (min dist: {closest_dist_limit}, max dist: {furthest_dist_limit}, min gte ratio: {geodesic_to_euclid_min_ratio})"
             )
     return goals

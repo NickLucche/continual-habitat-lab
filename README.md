@@ -11,3 +11,49 @@ Continual Habitat Lab is an alternative (yet inspired) to Habitat-Lab, providing
  - new actions can be defined leveraging the standard `habitat sim` registry. 
 
 This figure shows a bit what it's written above in great lenght:
+
+
+
+## Quick Example
+```python
+from continual_habitat_lab import ContinualHabitatLabConfig, ContinualHabitatEnv
+import random
+
+# Load config from yaml file 
+config = ContinualHabitatLabConfig.from_yaml("example_config.yaml")
+# ..or use default one
+config = ContinualHabitatLabConfig()
+# ..or even create it programatically
+cfg = {
+    "tasks": [{"type": "VoidTask", "max_steps": 10, 'name': 'QuickExampleTask'}],
+    "agent": {"sensor_specifications": [{"type": "RGBA", "resolution": [128, 128]}]},
+    "scene": {"scene_path": "./data/scene_datasets/habitat-test-scenes/skokloster-castle.glb"},
+}
+config = ContinualHabitatLabConfig(cfg, from_cli=False)
+config.simulator.random_seed = 7
+
+# check out good ol' habitat-sim configuration to see registered actions
+action_names = list(config.habitat_sim_config.agents[0].action_space.keys())
+print(action_names)
+n_episodes = 2
+with ContinualHabitatEnv(config) as env:
+    print("\n"*10 + "*"*50 + '\n'+"*"*50)
+    print("Current scene:", env.current_scene)
+    print("Available tasks:", [t.name for t in env.tasks])
+    for _ in range(n_episodes):
+        obs = env.reset()
+        print("Current task:", env.current_task)
+        print("Initial position", env.agent_position)
+
+        while not env.done:
+            # execute random action
+            action = env.action_space.sample()
+            # get the action space mapping as defined by the task
+            action_mapping = env.current_task._action_space_map
+            print("Action", action_mapping[action])
+            
+            obs, reward, done, _ = env.step(action)
+            print("Current position/orientation", env.agent_position, env.agent_rotation)
+
+        print("Episode terminated!")
+```
