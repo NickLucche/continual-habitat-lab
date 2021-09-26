@@ -20,6 +20,7 @@ LEFT_KEY = "a"
 RIGHT_KEY = "d"
 FINISH = "f"
 RANDOM_TP = "t"
+SAVE_FRAME = "p"
 
 
 # def rgb2bgr(image):
@@ -51,6 +52,7 @@ def visualize(flag: bool, obs):
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         print(img.shape)
         cv2.imshow("RGBA", img)
+        return img
 
 
 if __name__ == "__main__":
@@ -68,7 +70,7 @@ if __name__ == "__main__":
     config = ContinualHabitatLabConfig.from_yaml("example_config.yaml")
     # config.scene.max_scene_repeat_episodes = 1
 
-    print("Simulator configuration:\n", OmegaConf.to_yaml(config._config))
+    print("Simulator configuration:\n", config.to_yaml())
     with ContinualHabitatEnv(config) as env:
         task_idx = 0
         action_names = list(config.habitat_sim_config.agents[0].action_space.keys())
@@ -85,7 +87,7 @@ if __name__ == "__main__":
             print("Current task:", env.current_task)
             print("Initial position", env.agent_position)
 
-            visualize(args.interactive, obs)
+            img = visualize(args.interactive, obs)
             # assert env._curr_task_idx == task_idx, "Task should change at each new episode"
             task_idx = (task_idx + 1) % 2
             step = 0
@@ -105,6 +107,9 @@ if __name__ == "__main__":
                         action = "turn_right"
                     elif keystroke == ord(FINISH):
                         break
+                    elif keystroke == ord(SAVE_FRAME):
+                        print('saving image', img.shape, img.dtype)
+                        cv2.imwrite(f'habitat_{step}.png', img)
                     elif keystroke == ord(RANDOM_TP):
                         agent = env.sim.get_agent(0)
                         agent_state = habitat_sim.AgentState()
@@ -140,7 +145,7 @@ if __name__ == "__main__":
                 print("action", action)
                 obs, reward, done, _ = env.step(action)
                 print(f"Reward: {reward}, done: {done}")
-                visualize(args.interactive, obs)
+                img = visualize(args.interactive, obs)
                 print("Current position", env.agent_position)
                 step += 1
             if end:
