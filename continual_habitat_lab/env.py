@@ -4,7 +4,7 @@ import gym
 import gym.spaces.dict
 from gym.spaces.box import Box
 
-from habitat_sim import Simulator
+from habitat_sim import Simulator, AgentState
 from habitat_sim.logging import logger as habitat_logger
 from typing import List, Union
 from continual_habitat_lab.tasks.tasks import Task
@@ -87,6 +87,7 @@ class ContinualHabitatEnv(gym.Env):
         return self._last_observation
 
     # TODO: continuous actions spaces aren't supported with a nice api by habitat yet
+    # FIXME: Check scene change on step!
     def step(self, action: Union[str, int], dt: float = 1 / 60):
         # The desired amount of time to advance the physical world.
         assert (
@@ -222,6 +223,16 @@ class ContinualHabitatEnv(gym.Env):
     @property
     def agent_state(self):
         return self.sim.get_agent(0).get_state()
+
+    def set_agent_position(self, pos:np.ndarray, rotation: np.ndarray=None, as_initial_pos: bool=True):
+        agent_state = AgentState()
+        agent_state.position = pos
+        if rotation is None:
+            rotation = self.agent_rotation
+        agent_state.rotation = rotation
+        self.sim.get_agent(0).set_state(agent_state)
+        if as_initial_pos:
+            self.sim.get_agent(0).initial_state = agent_state
 
     @property
     def info(self):
