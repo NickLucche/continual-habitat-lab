@@ -272,6 +272,9 @@ class ContinualHabitatLabConfig(object):
     def refresh_config(self):
         return self._override_habitat_sim_config()
 
+    def to_yaml(self):
+        return OmegaConf.to_yaml(self._config)
+
     def make_habitat_sim_config(self, scene: str):
         # we need to re-instatiate the habitat-sim configuration or the simulator
         # won't recognize differences with previous object
