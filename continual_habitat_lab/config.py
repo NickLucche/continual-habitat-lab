@@ -156,12 +156,11 @@ from habitat_sim.agent.agent import _default_action_space
 
 @dataclass
 class ActionParamsConfig:
-    # TODO: this way we can keep default values and override a subset through config
+    # NOTE: this way we can keep default values and override a subset through config
     amount: float
 
 
 @dataclass
-# TODO: handle multi-agent
 class AgentConfig:
     action_space: Dict[str, Any] = field(
         default_factory=lambda: {

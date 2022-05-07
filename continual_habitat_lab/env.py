@@ -27,6 +27,8 @@ class ContinualHabitatEnv(gym.Env):
     _steps_since_task_change: int
     _config: ContinualHabitatLabConfig
     _last_observation: gym.spaces.dict.Dict
+    # gym backward compatibility 
+    metadata = {'render.modes': ['human', 'rgb_array'], 'render_modes': ['human', 'rgb_array']}
 
     def __init__(self, config: ContinualHabitatLabConfig, verbose: int = 0) -> None:
         if not verbose:
@@ -116,8 +118,14 @@ class ContinualHabitatEnv(gym.Env):
         self._steps_since_task_change += 1
         return obs, reward, self._episode_over, self.info
 
-    def render(self, mode):
-        return self._last_observation
+    def render(self, mode: str):
+        if self._last_observation is None:
+            raise Exception("Call `reset()` before calling render")
+        obs = self._last_observation["rgba"]
+        if mode == "rgb_array":
+            return obs[..., :3].astype(np.uint8)
+        elif mode == "human":
+            return obs
 
     def _get_task(self, is_reset: bool = False) -> Task:
         prev_task = self.current_task

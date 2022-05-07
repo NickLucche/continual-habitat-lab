@@ -8,6 +8,7 @@ from argparse import ArgumentParser
 import habitat_sim
 import os
 from continual_habitat_lab import ContinualHabitatLabConfig, ContinualHabitatEnv
+from gym.wrappers import RecordVideo
 
 # remove info logging
 os.environ["GLOG_minloglevel"] = "2"
@@ -63,6 +64,9 @@ if __name__ == "__main__":
     args.add_argument(
         "-n", "--n-episodes", help="Number of episodes to run", type=int, default=3,
     )
+    args.add_argument(
+        "-r", "--record-video", help="Record episode frames in `video` folder", action="store_true"
+    )
     args = args.parse_args()
     n_episodes = args.n_episodes
 
@@ -72,6 +76,8 @@ if __name__ == "__main__":
 
     print("Simulator configuration:\n", config.to_yaml())
     with ContinualHabitatEnv(config) as env:
+        if args.record_video:
+            env = RecordVideo(env, 'video', episode_trigger=lambda _: True)
         task_idx = 0
         action_names = list(config.habitat_sim_config.agents[0].action_space.keys())
         print("Available actions", action_names)

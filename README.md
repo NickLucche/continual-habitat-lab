@@ -57,3 +57,11 @@ with ContinualHabitatEnv(config) as env:
 
         print("Episode terminated!")
 ```
+
+# Installation
+
+Head over to https://github.com/facebookresearch/habitat-sim#installation for the latest instructions on how to install `habitat-sim`, containing the actual simulator engine. At the time of writing, this is as easy as doing `conda install habitat-sim -c conda-forge -c aihabitat` (desktop pc).
+Follow the instructions to get some samples and test out the installation.
+
+To try out a simple example, try running `p example.py -i` (interactive) after changing the `scene_path` and `object_asset` filepaths in `example_config.yaml`.
+

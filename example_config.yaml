@@ -1,5 +1,5 @@
 simulator:
-  random_seed: 17
+  random_seed: 77
 agent:
   height: 1.4
   sensor_specifications:
@@ -12,22 +12,29 @@ agent:
 
   # action_space:
     # move_forward:
-      # amount: 3.
+      # amount: 0.01
+    # turn_right:
+      # amount: 1
+    # turn_left:
+      # amount: 1
 tasks:
   - name: "MyTask"
-    # type: "VoidTask"
     type: "ObjectNav"
-    object_asset: '/home/nick/uni/thesis/continual-habitat-lab/data/objects/sphere'
+    object_asset: '/home/nick/projects/habitat-data/objects/skillet'
     max_steps: 1000
     difficulty: 'TRIVIAL'
   - name: "MyTask2"
     type: "VoidTask"
-    max_steps: 10
+    max_steps: 1000
 
 task_iterator:
   max_task_repeat_episodes: 1
 
 scene:
-  # dataset_paths: ['data/scene_datasets/habitat-test-scenes/']
-  # dataset_paths: ['/home/nick/datasets/habitat/gibson/gibson/']
-  scene_path: '/home/nick/datasets/habitat/replicav1/room_2/habitat/mesh_semantic.ply'
+  # to test out multiple datasets
+  # dataset_paths: ['/home/nick/projects/habitat-data/versioned_data/']
+  # max_scene_repeat_episodes: 1
+  # cycle_datasets: true
+  # to test out single datasets
+  scene_path: '/home/nick/projects/habitat-data/scene_datasets/apartment_1.glb'
+  # scene_path: '/home/nick/projects/habitat-data/versioned_data/hm3d-1.0/hm3d/example/00337-CFVBbU9Rsyb/CFVBbU9Rsyb.basis.glb'

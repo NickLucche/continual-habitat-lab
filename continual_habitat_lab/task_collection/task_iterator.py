@@ -78,8 +78,8 @@ class TaskIterator:
         if len(self.tasks) <= 1 or episode_num == 0:
             return False
 
-        cum_steps_change = self._config.task_iterator.get("max_task_repeat_steps", -1)
-        episodes_change = self._config.task_iterator.get("max_task_repeat_episodes", -1)
+        cum_steps_change = self._config.task_iterator.get("max_task_repeat_steps", None) or -1
+        episodes_change = self._config.task_iterator.get("max_task_repeat_episodes", None) or -1
         # print("Change task", episode_num, episodes_change)
         if cum_steps_change <= 0 and episodes_change <= 0:
             return False
